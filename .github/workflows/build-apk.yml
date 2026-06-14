@@ -70,8 +70,8 @@ jobs:
                   applicationId "com.trae.phonehelper"
                   minSdk 26
                   targetSdk 35
-                  versionCode 5
-                  versionName "1.4"
+                  versionCode 6
+                  versionName "1.4.1"
               }
           }
           EOF_app_build_gradle
@@ -435,11 +435,11 @@ jobs:
                   timerSecondInput = inputBox("秒");
                   timerSecondInput.setText("0");
                   timerSecondInput.setSingleLine(true);
-                  Button set = button("设定");
                   edit.addView(labelWrap("分钟", timerMinuteInput), weight());
                   edit.addView(labelWrap("秒", timerSecondInput), weight());
-                  edit.addView(set, weight());
                   timerPage.addView(edit);
+                  Button set = button("设定倒计时");
+                  timerPage.addView(set);
                   LinearLayout controls = row();
                   timerStartPause = button("开始");
                   Button reset = button("重置");
@@ -488,11 +488,11 @@ jobs:
                   pomoRestInput = inputBox("休息分钟");
                   pomoRestInput.setText("5");
                   pomoRestInput.setSingleLine(true);
-                  Button apply = button("应用");
                   edit.addView(labelWrap("专注", pomoFocusInput), weight());
                   edit.addView(labelWrap("休息", pomoRestInput), weight());
-                  edit.addView(apply, weight());
                   pomoPage.addView(edit);
+                  Button apply = button("应用番茄钟设置");
+                  pomoPage.addView(apply);
                   LinearLayout controls = row();
                   Button startPause = button("开始/暂停");
                   Button reset = button("重置");
@@ -1212,7 +1212,12 @@ jobs:
                   BufferedReader br = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8));
                   StringBuilder sb = new StringBuilder();
                   String line;
-                  while ((line = br.readLine()) != null) sb.append(line);
+                  boolean first = true;
+                  while ((line = br.readLine()) != null) {
+                      if (!first) sb.append('\n');
+                      sb.append(line);
+                      first = false;
+                  }
                   return sb.toString();
               }
           
@@ -1381,7 +1386,7 @@ jobs:
               }
           
               private String preview(String value) {
-                  String cleaned = value.replace("\n", " ").trim();
+                  String cleaned = value.trim();
                   if (cleaned.length() <= 120) return cleaned;
                   return cleaned.substring(0, 120) + "...";
               }
