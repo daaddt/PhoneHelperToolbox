@@ -1,0 +1,699 @@
+name: 构建手机助手工具箱 APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 获取仓库
+        uses: actions/checkout@v4
+
+      - name: 安装 Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: 安装 Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 生成安卓项目源码
+        shell: bash
+        run: |
+          set -e
+          mkdir -p "$(dirname 'settings.gradle')"
+          cat > 'settings.gradle' <<'EOF_settings_gradle'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          
+          rootProject.name = "PhoneHelperToolbox"
+          include ":app"
+          EOF_settings_gradle
+
+          mkdir -p "$(dirname 'build.gradle')"
+          cat > 'build.gradle' <<'EOF_build_gradle'
+          plugins {
+              id "com.android.application" version "8.5.2" apply false
+          }
+          EOF_build_gradle
+
+          mkdir -p "$(dirname 'app/build.gradle')"
+          cat > 'app/build.gradle' <<'EOF_app_build_gradle'
+          plugins {
+              id "com.android.application"
+          }
+          
+          android {
+              namespace "com.trae.phonehelper"
+              compileSdk 35
+          
+              defaultConfig {
+                  applicationId "com.trae.phonehelper"
+                  minSdk 26
+                  targetSdk 35
+                  versionCode 1
+                  versionName "1.0"
+              }
+          }
+          EOF_app_build_gradle
+
+          mkdir -p "$(dirname 'app/src/main/AndroidManifest.xml')"
+          cat > 'app/src/main/AndroidManifest.xml' <<'EOF_app_src_main_AndroidManifest_xml'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+          
+              <application
+                  android:allowBackup="true"
+                  android:theme="@style/AppTheme"
+                  android:label="手机助手工具箱"
+                  android:resizeableActivity="true"
+                  android:supportsRtl="true">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF_app_src_main_AndroidManifest_xml
+
+          mkdir -p "$(dirname 'app/src/main/res/values/styles.xml')"
+          cat > 'app/src/main/res/values/styles.xml' <<'EOF_app_src_main_res_values_styles_xml'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">
+                  <item name="android:fontFamily">sans</item>
+                  <item name="android:windowLightStatusBar">false</item>
+                  <item name="android:statusBarColor">#07111F</item>
+                  <item name="android:navigationBarColor">#07111F</item>
+                  <item name="android:colorAccent">#38BDF8</item>
+              </style>
+          </resources>
+          EOF_app_src_main_res_values_styles_xml
+
+          mkdir -p "$(dirname 'app/src/main/java/com/trae/phonehelper/MainActivity.java')"
+          cat > 'app/src/main/java/com/trae/phonehelper/MainActivity.java' <<'EOF_app_src_main_java_com_trae_phonehelper_MainActivity_java'
+          package com.trae.phonehelper;
+          
+          import android.app.Activity;
+          import android.content.ClipData;
+          import android.content.ClipboardManager;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.SharedPreferences;
+          import android.graphics.Color;
+          import android.graphics.Typeface;
+          import android.graphics.drawable.GradientDrawable;
+          import android.net.Uri;
+          import android.os.Bundle;
+          import android.view.Gravity;
+          import android.view.View;
+          import android.view.inputmethod.InputMethodManager;
+          import android.widget.Button;
+          import android.widget.EditText;
+          import android.widget.LinearLayout;
+          import android.widget.ScrollView;
+          import android.widget.TextView;
+          import android.widget.Toast;
+          
+          import org.json.JSONArray;
+          import org.json.JSONObject;
+          
+          import java.util.ArrayList;
+          import java.util.List;
+          
+          public class MainActivity extends Activity {
+              private static final String PREF = "phone_helper_pref";
+              private SharedPreferences pref;
+          
+              private LinearLayout splitPage;
+              private LinearLayout textPage;
+              private LinearLayout linkPage;
+              private LinearLayout splitResultList;
+              private LinearLayout savedTextList;
+              private LinearLayout linkList;
+              private EditText longTextInput;
+              private EditText splitSizeInput;
+              private EditText titleInput;
+              private EditText contentInput;
+              private EditText linkTitleInput;
+              private EditText linkUrlInput;
+              private Button splitTab;
+              private Button textTab;
+              private Button linkTab;
+              private TextView statusText;
+          
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  pref = getSharedPreferences(PREF, MODE_PRIVATE);
+                  ensureDefaults();
+                  buildUi();
+                  renderSavedTexts();
+                  renderLinks();
+              }
+          
+              private void buildUi() {
+                  ScrollView scroll = new ScrollView(this);
+                  scroll.setFillViewport(true);
+                  scroll.setBackgroundColor(Color.rgb(7, 17, 31));
+          
+                  LinearLayout root = new LinearLayout(this);
+                  root.setOrientation(LinearLayout.VERTICAL);
+                  root.setPadding(28, 36, 28, 28);
+                  scroll.addView(root);
+          
+                  TextView title = text("手机助手工具箱", 32, Color.WHITE);
+                  title.setTypeface(Typeface.DEFAULT_BOLD);
+                  title.setGravity(Gravity.CENTER_HORIZONTAL);
+                  root.addView(title);
+          
+                  TextView subtitle = text("分段复制 · 常用文本 · 快捷打开", 14, Color.rgb(148, 163, 184));
+                  subtitle.setGravity(Gravity.CENTER_HORIZONTAL);
+                  root.addView(subtitle);
+          
+                  LinearLayout tabs = row();
+                  splitTab = button("分段复制");
+                  textTab = button("常用文本");
+                  linkTab = button("快捷打开");
+                  tabs.addView(splitTab, weight());
+                  tabs.addView(textTab, weight());
+                  tabs.addView(linkTab, weight());
+                  root.addView(tabs);
+          
+                  statusText = text("准备就绪", 14, Color.rgb(52, 211, 153));
+                  root.addView(statusText);
+          
+                  splitPage = page();
+                  textPage = page();
+                  linkPage = page();
+                  root.addView(splitPage);
+                  root.addView(textPage);
+                  root.addView(linkPage);
+          
+                  buildSplitPage();
+                  buildTextPage();
+                  buildLinkPage();
+          
+                  splitTab.setOnClickListener(v -> showPage("split"));
+                  textTab.setOnClickListener(v -> showPage("text"));
+                  linkTab.setOnClickListener(v -> showPage("link"));
+                  setContentView(scroll);
+                  showPage("split");
+              }
+          
+              private void buildSplitPage() {
+                  splitPage.addView(sectionTitle("长文本分段复制"));
+                  splitPage.addView(infoCard("把很长的代码、工作流、提示词粘到这里，App 会自动分段，每段都有复制按钮。"));
+          
+                  longTextInput = inputBox("粘贴长文本");
+                  longTextInput.setMinLines(8);
+                  longTextInput.setGravity(Gravity.TOP);
+                  splitPage.addView(longTextInput);
+          
+                  splitSizeInput = inputBox("每段最大字数，默认 3000");
+                  splitSizeInput.setText("3000");
+                  splitSizeInput.setSingleLine(true);
+                  splitPage.addView(labelWrap("分段长度", splitSizeInput));
+          
+                  LinearLayout actions = row();
+                  Button generate = button("生成分段");
+                  Button clear = button("清空");
+                  actions.addView(generate, weight());
+                  actions.addView(clear, weight());
+                  splitPage.addView(actions);
+          
+                  splitResultList = new LinearLayout(this);
+                  splitResultList.setOrientation(LinearLayout.VERTICAL);
+                  splitPage.addView(splitResultList);
+          
+                  generate.setOnClickListener(v -> generateChunks());
+                  clear.setOnClickListener(v -> {
+                      longTextInput.setText("");
+                      splitResultList.removeAllViews();
+                      statusText.setText("已清空");
+                  });
+              }
+          
+              private void buildTextPage() {
+                  textPage.addView(sectionTitle("常用文本"));
+                  textPage.addView(infoCard("保存常用路径、API 地址、模型名、提交信息。以后点一下就能复制。"));
+          
+                  titleInput = inputBox("标题，例如 OpenRouter API 地址");
+                  titleInput.setSingleLine(true);
+                  contentInput = inputBox("内容");
+                  contentInput.setMinLines(3);
+                  contentInput.setGravity(Gravity.TOP);
+                  textPage.addView(labelWrap("标题", titleInput));
+                  textPage.addView(labelWrap("内容", contentInput));
+          
+                  Button add = button("添加常用文本");
+                  textPage.addView(add);
+          
+                  savedTextList = new LinearLayout(this);
+                  savedTextList.setOrientation(LinearLayout.VERTICAL);
+                  textPage.addView(savedTextList);
+          
+                  add.setOnClickListener(v -> addSavedText());
+              }
+          
+              private void buildLinkPage() {
+                  linkPage.addView(sectionTitle("快捷打开"));
+                  linkPage.addView(infoCard("保存常用网站，一键打开 GitHub、OpenRouter、Actions 等页面。"));
+          
+                  linkTitleInput = inputBox("标题，例如 GitHub");
+                  linkTitleInput.setSingleLine(true);
+                  linkUrlInput = inputBox("网址，例如 https://github.com");
+                  linkUrlInput.setSingleLine(true);
+                  linkPage.addView(labelWrap("标题", linkTitleInput));
+                  linkPage.addView(labelWrap("网址", linkUrlInput));
+          
+                  Button add = button("添加快捷链接");
+                  linkPage.addView(add);
+          
+                  linkList = new LinearLayout(this);
+                  linkList.setOrientation(LinearLayout.VERTICAL);
+                  linkPage.addView(linkList);
+          
+                  add.setOnClickListener(v -> addLink());
+              }
+          
+              private void generateChunks() {
+                  String source = longTextInput.getText().toString();
+                  if (source.trim().isEmpty()) {
+                      toast("请先粘贴长文本");
+                      return;
+                  }
+                  int size = parseInt(splitSizeInput.getText().toString(), 3000);
+                  size = Math.max(500, Math.min(10000, size));
+                  splitSizeInput.setText(String.valueOf(size));
+          
+                  splitResultList.removeAllViews();
+                  int count = 0;
+                  for (int start = 0; start < source.length(); start += size) {
+                      int end = Math.min(source.length(), start + size);
+                      String chunk = source.substring(start, end);
+                      count++;
+                      splitResultList.addView(chunkCard(count, chunk));
+                  }
+                  hideKeyboard();
+                  statusText.setText("已生成 " + count + " 段");
+              }
+          
+              private View chunkCard(int index, String chunk) {
+                  LinearLayout card = card();
+                  TextView title = text(String.format("第 %02d 段 · %d 字", index, chunk.length()), 18, Color.WHITE);
+                  title.setTypeface(Typeface.DEFAULT_BOLD);
+                  card.addView(title);
+                  TextView preview = text(preview(chunk), 14, Color.LTGRAY);
+                  card.addView(preview);
+                  Button copy = button("复制第 " + String.format("%02d", index) + " 段");
+                  copy.setOnClickListener(v -> copyText("第 " + index + " 段", chunk));
+                  card.addView(copy);
+                  return card;
+              }
+          
+              private void addSavedText() {
+                  String title = titleInput.getText().toString().trim();
+                  String content = contentInput.getText().toString();
+                  if (title.isEmpty() || content.trim().isEmpty()) {
+                      toast("标题和内容都要填写");
+                      return;
+                  }
+                  JSONArray array = loadArray("texts");
+                  try {
+                      JSONObject obj = new JSONObject();
+                      obj.put("title", title);
+                      obj.put("content", content);
+                      array.put(obj);
+                      saveArray("texts", array);
+                  } catch (Exception ignored) {
+                  }
+                  titleInput.setText("");
+                  contentInput.setText("");
+                  renderSavedTexts();
+                  hideKeyboard();
+                  statusText.setText("已添加常用文本");
+              }
+          
+              private void renderSavedTexts() {
+                  if (savedTextList == null) return;
+                  savedTextList.removeAllViews();
+                  JSONArray array = loadArray("texts");
+                  for (int i = 0; i < array.length(); i++) {
+                      try {
+                          JSONObject obj = array.getJSONObject(i);
+                          savedTextList.addView(savedTextCard(i, obj.optString("title"), obj.optString("content")));
+                      } catch (Exception ignored) {
+                      }
+                  }
+              }
+          
+              private View savedTextCard(int index, String title, String content) {
+                  LinearLayout card = card();
+                  TextView titleView = text(title, 18, Color.WHITE);
+                  titleView.setTypeface(Typeface.DEFAULT_BOLD);
+                  card.addView(titleView);
+                  card.addView(text(preview(content), 14, Color.LTGRAY));
+                  LinearLayout actions = row();
+                  Button copy = button("复制");
+                  Button delete = button("删除");
+                  copy.setOnClickListener(v -> copyText(title, content));
+                  delete.setOnClickListener(v -> {
+                      removeItem("texts", index);
+                      renderSavedTexts();
+                      statusText.setText("已删除常用文本");
+                  });
+                  actions.addView(copy, weight());
+                  actions.addView(delete, weight());
+                  card.addView(actions);
+                  return card;
+              }
+          
+              private void addLink() {
+                  String title = linkTitleInput.getText().toString().trim();
+                  String url = linkUrlInput.getText().toString().trim();
+                  if (title.isEmpty() || url.isEmpty()) {
+                      toast("标题和网址都要填写");
+                      return;
+                  }
+                  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                      url = "https://" + url;
+                  }
+                  JSONArray array = loadArray("links");
+                  try {
+                      JSONObject obj = new JSONObject();
+                      obj.put("title", title);
+                      obj.put("url", url);
+                      array.put(obj);
+                      saveArray("links", array);
+                  } catch (Exception ignored) {
+                  }
+                  linkTitleInput.setText("");
+                  linkUrlInput.setText("");
+                  renderLinks();
+                  hideKeyboard();
+                  statusText.setText("已添加快捷链接");
+              }
+          
+              private void renderLinks() {
+                  if (linkList == null) return;
+                  linkList.removeAllViews();
+                  JSONArray array = loadArray("links");
+                  for (int i = 0; i < array.length(); i++) {
+                      try {
+                          JSONObject obj = array.getJSONObject(i);
+                          linkList.addView(linkCard(i, obj.optString("title"), obj.optString("url")));
+                      } catch (Exception ignored) {
+                      }
+                  }
+              }
+          
+              private View linkCard(int index, String title, String url) {
+                  LinearLayout card = card();
+                  TextView titleView = text(title, 18, Color.WHITE);
+                  titleView.setTypeface(Typeface.DEFAULT_BOLD);
+                  card.addView(titleView);
+                  card.addView(text(url, 13, Color.LTGRAY));
+                  LinearLayout actions = row();
+                  Button open = button("打开");
+                  Button copy = button("复制网址");
+                  Button delete = button("删除");
+                  open.setOnClickListener(v -> openUrl(url));
+                  copy.setOnClickListener(v -> copyText(title + "网址", url));
+                  delete.setOnClickListener(v -> {
+                      removeItem("links", index);
+                      renderLinks();
+                      statusText.setText("已删除快捷链接");
+                  });
+                  actions.addView(open, weight());
+                  actions.addView(copy, weight());
+                  actions.addView(delete, weight());
+                  card.addView(actions);
+                  return card;
+              }
+          
+              private void copyText(String label, String value) {
+                  ClipboardManager manager = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                  if (manager != null) {
+                      manager.setPrimaryClip(ClipData.newPlainText(label, value));
+                      statusText.setText("已复制：" + label);
+                      toast("已复制");
+                  }
+              }
+          
+              private void openUrl(String url) {
+                  try {
+                      startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+                  } catch (Exception e) {
+                      toast("打不开这个网址");
+                  }
+              }
+          
+              private void ensureDefaults() {
+                  if (!pref.getBoolean("defaultsReady", false)) {
+                      JSONArray texts = new JSONArray();
+                      addDefaultText(texts, "GitHub Actions 文件名", ".github/workflows/build-apk.yml");
+                      addDefaultText(texts, "OpenRouter API 地址", "https://openrouter.ai/api/v1/chat/completions");
+                      addDefaultText(texts, "OpenRouter 免费模型", "openrouter/free");
+                      addDefaultText(texts, "提交信息：添加 APK 打包流程", "添加安卓APK打包流程");
+                      addDefaultText(texts, "提交信息：升级版本", "升级版本");
+                      JSONArray links = new JSONArray();
+                      addDefaultLink(links, "GitHub", "https://github.com");
+                      addDefaultLink(links, "OpenRouter", "https://openrouter.ai");
+                      addDefaultLink(links, "OpenRouter Keys", "https://openrouter.ai/settings/keys");
+                      addDefaultLink(links, "DeepSeek API", "https://platform.deepseek.com");
+                      pref.edit()
+                              .putString("texts", texts.toString())
+                              .putString("links", links.toString())
+                              .putBoolean("defaultsReady", true)
+                              .apply();
+                  }
+              }
+          
+              private void addDefaultText(JSONArray array, String title, String content) {
+                  try {
+                      JSONObject obj = new JSONObject();
+                      obj.put("title", title);
+                      obj.put("content", content);
+                      array.put(obj);
+                  } catch (Exception ignored) {
+                  }
+              }
+          
+              private void addDefaultLink(JSONArray array, String title, String url) {
+                  try {
+                      JSONObject obj = new JSONObject();
+                      obj.put("title", title);
+                      obj.put("url", url);
+                      array.put(obj);
+                  } catch (Exception ignored) {
+                  }
+              }
+          
+              private JSONArray loadArray(String key) {
+                  try {
+                      return new JSONArray(pref.getString(key, "[]"));
+                  } catch (Exception e) {
+                      return new JSONArray();
+                  }
+              }
+          
+              private void saveArray(String key, JSONArray array) {
+                  pref.edit().putString(key, array.toString()).apply();
+              }
+          
+              private void removeItem(String key, int index) {
+                  JSONArray source = loadArray(key);
+                  JSONArray result = new JSONArray();
+                  for (int i = 0; i < source.length(); i++) {
+                      if (i == index) continue;
+                      try {
+                          result.put(source.getJSONObject(i));
+                      } catch (Exception ignored) {
+                      }
+                  }
+                  saveArray(key, result);
+              }
+          
+              private String preview(String value) {
+                  String cleaned = value.replace("\n", " ").trim();
+                  if (cleaned.length() <= 120) return cleaned;
+                  return cleaned.substring(0, 120) + "...";
+              }
+          
+              private void showPage(String page) {
+                  splitPage.setVisibility("split".equals(page) ? View.VISIBLE : View.GONE);
+                  textPage.setVisibility("text".equals(page) ? View.VISIBLE : View.GONE);
+                  linkPage.setVisibility("link".equals(page) ? View.VISIBLE : View.GONE);
+                  splitTab.setAlpha("split".equals(page) ? 1f : 0.55f);
+                  textTab.setAlpha("text".equals(page) ? 1f : 0.55f);
+                  linkTab.setAlpha("link".equals(page) ? 1f : 0.55f);
+              }
+          
+              private TextView text(String value, int sp, int color) {
+                  TextView tv = new TextView(this);
+                  tv.setText(value);
+                  tv.setTextSize(sp);
+                  tv.setTextColor(color);
+                  tv.setPadding(0, 10, 0, 10);
+                  return tv;
+              }
+          
+              private TextView sectionTitle(String value) {
+                  TextView tv = text(value, 22, Color.WHITE);
+                  tv.setTypeface(Typeface.DEFAULT_BOLD);
+                  tv.setPadding(0, 28, 0, 10);
+                  return tv;
+              }
+          
+              private TextView infoCard(String value) {
+                  TextView tv = text(value, 14, Color.LTGRAY);
+                  GradientDrawable bg = new GradientDrawable();
+                  bg.setColor(Color.rgb(15, 23, 42));
+                  bg.setStroke(2, Color.rgb(51, 65, 85));
+                  bg.setCornerRadius(18);
+                  tv.setBackground(bg);
+                  tv.setPadding(18, 16, 18, 16);
+                  return tv;
+              }
+          
+              private Button button(String value) {
+                  Button b = new Button(this);
+                  b.setText(value);
+                  b.setTextSize(15);
+                  b.setAllCaps(false);
+                  b.setTextColor(Color.WHITE);
+                  GradientDrawable bg = new GradientDrawable(
+                          GradientDrawable.Orientation.LEFT_RIGHT,
+                          new int[]{Color.rgb(14, 165, 233), Color.rgb(16, 185, 129)}
+                  );
+                  bg.setCornerRadius(22);
+                  b.setBackground(bg);
+                  b.setPadding(6, 8, 6, 8);
+                  return b;
+              }
+          
+              private EditText inputBox(String hint) {
+                  EditText e = new EditText(this);
+                  e.setHint(hint);
+                  e.setTextColor(Color.WHITE);
+                  e.setHintTextColor(Color.rgb(148, 163, 184));
+                  e.setTextSize(16);
+                  GradientDrawable bg = new GradientDrawable();
+                  bg.setColor(Color.rgb(15, 23, 42));
+                  bg.setStroke(2, Color.rgb(51, 65, 85));
+                  bg.setCornerRadius(18);
+                  e.setBackground(bg);
+                  e.setPadding(16, 12, 16, 12);
+                  return e;
+              }
+          
+              private LinearLayout card() {
+                  LinearLayout card = new LinearLayout(this);
+                  card.setOrientation(LinearLayout.VERTICAL);
+                  card.setPadding(16, 14, 16, 14);
+                  GradientDrawable bg = new GradientDrawable();
+                  bg.setColor(Color.rgb(15, 23, 42));
+                  bg.setStroke(2, Color.rgb(51, 65, 85));
+                  bg.setCornerRadius(18);
+                  card.setBackground(bg);
+                  LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                          LinearLayout.LayoutParams.MATCH_PARENT,
+                          LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  lp.setMargins(0, 10, 0, 10);
+                  card.setLayoutParams(lp);
+                  return card;
+              }
+          
+              private LinearLayout labelWrap(String label, View child) {
+                  LinearLayout wrap = new LinearLayout(this);
+                  wrap.setOrientation(LinearLayout.VERTICAL);
+                  wrap.addView(text(label, 14, Color.LTGRAY));
+                  wrap.addView(child);
+                  return wrap;
+              }
+          
+              private LinearLayout row() {
+                  LinearLayout row = new LinearLayout(this);
+                  row.setOrientation(LinearLayout.HORIZONTAL);
+                  row.setGravity(Gravity.CENTER);
+                  row.setPadding(0, 8, 0, 8);
+                  return row;
+              }
+          
+              private LinearLayout page() {
+                  LinearLayout page = new LinearLayout(this);
+                  page.setOrientation(LinearLayout.VERTICAL);
+                  return page;
+              }
+          
+              private LinearLayout.LayoutParams weight() {
+                  return new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+              }
+          
+              private int parseInt(String value, int fallback) {
+                  try {
+                      return Integer.parseInt(value.trim());
+                  } catch (Exception e) {
+                      return fallback;
+                  }
+              }
+          
+              private void hideKeyboard() {
+                  try {
+                      InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                      View view = getCurrentFocus();
+                      if (imm != null && view != null) imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+                  } catch (Exception ignored) {
+                  }
+              }
+          
+              private void toast(String value) {
+                  Toast.makeText(this, value, Toast.LENGTH_SHORT).show();
+              }
+          }
+          EOF_app_src_main_java_com_trae_phonehelper_MainActivity_java
+
+      - name: 安装 Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: 安装 Android 平台
+        shell: bash
+        run: |
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+
+      - name: 构建 APK
+        run: gradle assembleDebug
+
+      - name: 上传 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: phone-helper-toolbox-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
