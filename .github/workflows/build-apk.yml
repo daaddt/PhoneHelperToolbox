@@ -70,8 +70,8 @@ jobs:
                   applicationId "com.trae.phonehelper"
                   minSdk 26
                   targetSdk 35
-                  versionCode 4
-                  versionName "1.3"
+                  versionCode 5
+                  versionName "1.4"
               }
           }
           EOF_app_build_gradle
@@ -161,15 +161,17 @@ jobs:
           public class MainActivity extends Activity {
               private static final String PREF = "phone_helper_pref";
               private static final int PICK_TEXT_FILE = 3001;
+              private static final int CREATE_BACKUP_FILE = 3002;
+              private static final int PICK_BACKUP_FILE = 3003;
               private SharedPreferences pref;
               private final Handler handler = new Handler();
           
-              private LinearLayout homePage, splitPage, textPage, linkPage, timerPage, pomoPage, aiPage, aiSettingsPage;
+              private LinearLayout homePage, splitPage, textPage, linkPage, timerPage, pomoPage, aiPage, aiSettingsPage, backupPage;
               private LinearLayout splitResultList, savedTextList, linkList, aiMessageList;
               private EditText longTextInput, splitSizeInput, titleInput, contentInput, linkTitleInput, linkUrlInput;
               private EditText aiInput, apiUrlInput, apiKeyInput, modelInput, systemPromptInput;
               private TextView statusText, timerDisplay, pomoDisplay, pomoStateText, pomoCountText;
-              private Button homeTab, splitTab, textTab, linkTab, timerTab, pomoTab, aiTab, aiSettingsTab;
+              private Button homeTab, splitTab, textTab, linkTab, timerTab, pomoTab, aiTab, aiSettingsTab, backupTab;
               private Button stopwatchTab, countdownTab, timerStartPause;
               private EditText timerMinuteInput, timerSecondInput, pomoFocusInput, pomoRestInput;
           
@@ -267,8 +269,10 @@ jobs:
                   LinearLayout tabs3 = row();
                   aiTab = button("AI聊天");
                   aiSettingsTab = button("AI设置");
+                  backupTab = button("备份");
                   tabs3.addView(aiTab, weight());
                   tabs3.addView(aiSettingsTab, weight());
+                  tabs3.addView(backupTab, weight());
                   root.addView(tabs3);
           
                   statusText = text("准备就绪", 14, Color.rgb(52, 211, 153));
@@ -282,6 +286,7 @@ jobs:
                   pomoPage = page();
                   aiPage = page();
                   aiSettingsPage = page();
+                  backupPage = page();
                   root.addView(homePage);
                   root.addView(splitPage);
                   root.addView(textPage);
@@ -290,6 +295,7 @@ jobs:
                   root.addView(pomoPage);
                   root.addView(aiPage);
                   root.addView(aiSettingsPage);
+                  root.addView(backupPage);
           
                   buildHomePage();
                   buildSplitPage();
@@ -299,6 +305,7 @@ jobs:
                   buildPomoPage();
                   buildAiPage();
                   buildAiSettingsPage();
+                  buildBackupPage();
           
                   homeTab.setOnClickListener(v -> showPage("home"));
                   splitTab.setOnClickListener(v -> showPage("split"));
@@ -308,6 +315,7 @@ jobs:
                   pomoTab.setOnClickListener(v -> showPage("pomo"));
                   aiTab.setOnClickListener(v -> showPage("ai"));
                   aiSettingsTab.setOnClickListener(v -> showPage("aiSettings"));
+                  backupTab.setOnClickListener(v -> showPage("backup"));
           
                   setContentView(scroll);
                   showPage("home");
@@ -315,12 +323,16 @@ jobs:
           
               private void buildHomePage() {
                   homePage.addView(sectionTitle("功能目录"));
-                  homePage.addView(infoCard("这是你的手机操作增强工具箱。常用复制、网址打开、计时和番茄钟都放在这里。"));
+                  homePage.addView(infoCard("这是你的手机操作增强工具箱。常用复制、网址打开、计时、番茄钟和 AI 都放在这里。"));
+                  homePage.addView(sectionTitle("常用工具"));
                   homePage.addView(homeButton("分段复制", "把长代码、长提示词、工作流自动拆成多段复制", "split"));
                   homePage.addView(homeButton("常用文本", "保存 API 地址、模型名、提交信息等常用内容", "text"));
                   homePage.addView(homeButton("快捷打开", "一键打开 GitHub、OpenRouter 等常用网页", "link"));
+                  homePage.addView(homeButton("数据备份", "导出或导入常用文本和快捷链接", "backup"));
+                  homePage.addView(sectionTitle("学习工具"));
                   homePage.addView(homeButton("计时器", "正计时、倒计时和快速倒计时", "timer"));
                   homePage.addView(homeButton("番茄钟", "专注 25 分钟，休息 5 分钟，记录今日完成数", "pomo"));
+                  homePage.addView(sectionTitle("AI工具"));
                   homePage.addView(homeButton("AI聊天", "接入 OpenAI 兼容接口，支持 openrouter/free", "ai"));
                   homePage.addView(homeButton("AI设置", "填写 API 地址、API Key、模型名和智能体设定", "aiSettings"));
               }
@@ -552,8 +564,10 @@ jobs:
                   LinearLayout actions = row();
                   Button save = button("保存设置");
                   Button test = button("测试连接");
+                  Button defaults = button("默认配置");
                   actions.addView(save, weight());
                   actions.addView(test, weight());
+                  actions.addView(defaults, weight());
                   aiSettingsPage.addView(actions);
           
                   save.setOnClickListener(v -> {
@@ -565,6 +579,21 @@ jobs:
                       saveAiSettings();
                       testAiConnection();
                   });
+                  defaults.setOnClickListener(v -> fillDefaultAiSettings());
+              }
+          
+              private void buildBackupPage() {
+                  backupPage.addView(sectionTitle("数据备份"));
+                  backupPage.addView(infoCard("导出和导入常用文本、快捷链接。不会导出 AI Key，避免密钥泄露。"));
+                  LinearLayout actions = row();
+                  Button export = button("导出备份");
+                  Button importBackup = button("导入备份");
+                  actions.addView(export, weight());
+                  actions.addView(importBackup, weight());
+                  backupPage.addView(actions);
+                  backupPage.addView(infoCard("导出的文件是 JSON 文本。换手机、重装 App 或误删内容时，可以用它恢复常用文本和快捷链接。"));
+                  export.setOnClickListener(v -> createBackupFile());
+                  importBackup.setOnClickListener(v -> chooseBackupFile());
               }
           
               private void chooseTextFile() {
@@ -582,11 +611,32 @@ jobs:
                   startActivityForResult(intent, PICK_TEXT_FILE);
               }
           
+              private void createBackupFile() {
+                  Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                  intent.addCategory(Intent.CATEGORY_OPENABLE);
+                  intent.setType("application/json");
+                  intent.putExtra(Intent.EXTRA_TITLE, "phone-helper-backup.json");
+                  startActivityForResult(intent, CREATE_BACKUP_FILE);
+              }
+          
+              private void chooseBackupFile() {
+                  Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                  intent.addCategory(Intent.CATEGORY_OPENABLE);
+                  intent.setType("*/*");
+                  String[] mimeTypes = new String[]{"application/json", "text/*", "application/octet-stream"};
+                  intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
+                  startActivityForResult(intent, PICK_BACKUP_FILE);
+              }
+          
               @Override
               protected void onActivityResult(int requestCode, int resultCode, Intent data) {
                   super.onActivityResult(requestCode, resultCode, data);
                   if (requestCode == PICK_TEXT_FILE && resultCode == RESULT_OK && data != null && data.getData() != null) {
                       importTextFile(data.getData());
+                  } else if (requestCode == CREATE_BACKUP_FILE && resultCode == RESULT_OK && data != null && data.getData() != null) {
+                      exportBackup(data.getData());
+                  } else if (requestCode == PICK_BACKUP_FILE && resultCode == RESULT_OK && data != null && data.getData() != null) {
+                      importBackup(data.getData());
                   }
               }
           
@@ -606,6 +656,50 @@ jobs:
                       statusText.setText("已导入文件，共 " + content.length() + " 字");
                       toast("导入成功");
                       showPage("split");
+                  } catch (Exception e) {
+                      statusText.setText("导入失败：" + shortError(e.getMessage()));
+                      toast("导入失败");
+                  }
+              }
+          
+              private void exportBackup(Uri uri) {
+                  try (OutputStream outputStream = getContentResolver().openOutputStream(uri)) {
+                      if (outputStream == null) {
+                          toast("无法创建备份文件");
+                          return;
+                      }
+                      JSONObject backup = new JSONObject();
+                      backup.put("version", 1);
+                      backup.put("texts", loadArray("texts"));
+                      backup.put("links", loadArray("links"));
+                      outputStream.write(backup.toString(2).getBytes(StandardCharsets.UTF_8));
+                      statusText.setText("备份已导出");
+                      toast("导出成功");
+                  } catch (Exception e) {
+                      statusText.setText("导出失败：" + shortError(e.getMessage()));
+                      toast("导出失败");
+                  }
+              }
+          
+              private void importBackup(Uri uri) {
+                  try (InputStream inputStream = getContentResolver().openInputStream(uri)) {
+                      if (inputStream == null) {
+                          toast("无法读取备份文件");
+                          return;
+                      }
+                      JSONObject backup = new JSONObject(readAll(inputStream));
+                      JSONArray texts = backup.optJSONArray("texts");
+                      JSONArray links = backup.optJSONArray("links");
+                      if (texts == null && links == null) {
+                          toast("这不是有效的备份文件");
+                          return;
+                      }
+                      if (texts != null) saveArray("texts", texts);
+                      if (links != null) saveArray("links", links);
+                      renderSavedTexts();
+                      renderLinks();
+                      statusText.setText("备份已导入");
+                      toast("导入成功");
                   } catch (Exception e) {
                       statusText.setText("导入失败：" + shortError(e.getMessage()));
                       toast("导入失败");
@@ -1144,21 +1238,27 @@ jobs:
                   }
               }
           
-              private TextView aiBubble(String role, String content) {
+              private View aiBubble(String role, String content) {
                   boolean user = "user".equals(role);
+                  LinearLayout wrap = new LinearLayout(this);
+                  wrap.setOrientation(LinearLayout.VERTICAL);
                   TextView tv = text((user ? "你：\n" : "助手：\n") + content, 15, Color.WHITE);
                   GradientDrawable bg = new GradientDrawable();
                   bg.setColor(user ? Color.rgb(14, 116, 144) : Color.rgb(30, 41, 59));
                   bg.setCornerRadius(20);
                   tv.setBackground(bg);
                   tv.setPadding(18, 14, 18, 14);
+                  wrap.addView(tv);
+                  Button copy = button(user ? "复制我的消息" : "复制 AI 回复");
+                  copy.setOnClickListener(v -> copyText(user ? "我的消息" : "AI 回复", content));
+                  wrap.addView(copy);
                   LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                           LinearLayout.LayoutParams.MATCH_PARENT,
                           LinearLayout.LayoutParams.WRAP_CONTENT
                   );
                   lp.setMargins(0, 8, 0, 8);
-                  tv.setLayoutParams(lp);
-                  return tv;
+                  wrap.setLayoutParams(lp);
+                  return wrap;
               }
           
               private void saveAiSettings() {
@@ -1168,6 +1268,15 @@ jobs:
                           .putString("aiModel", modelInput.getText().toString().trim())
                           .putString("aiSystemPrompt", systemPromptInput.getText().toString().trim())
                           .apply();
+              }
+          
+              private void fillDefaultAiSettings() {
+                  apiUrlInput.setText("https://openrouter.ai/api/v1/chat/completions");
+                  modelInput.setText("openrouter/free");
+                  if (systemPromptInput.getText().toString().trim().isEmpty()) {
+                      systemPromptInput.setText("你是一个耐心、有逻辑、说中文的智能助手。回答要清晰、实用、不过度啰嗦。");
+                  }
+                  statusText.setText("已填入 OpenRouter 免费模型默认配置");
               }
           
               private void loadAiMessages() {
@@ -1286,6 +1395,7 @@ jobs:
                   pomoPage.setVisibility("pomo".equals(pageName) ? View.VISIBLE : View.GONE);
                   aiPage.setVisibility("ai".equals(pageName) ? View.VISIBLE : View.GONE);
                   aiSettingsPage.setVisibility("aiSettings".equals(pageName) ? View.VISIBLE : View.GONE);
+                  backupPage.setVisibility("backup".equals(pageName) ? View.VISIBLE : View.GONE);
                   homeTab.setAlpha("home".equals(pageName) ? 1f : 0.55f);
                   splitTab.setAlpha("split".equals(pageName) ? 1f : 0.55f);
                   textTab.setAlpha("text".equals(pageName) ? 1f : 0.55f);
@@ -1294,6 +1404,7 @@ jobs:
                   pomoTab.setAlpha("pomo".equals(pageName) ? 1f : 0.55f);
                   aiTab.setAlpha("ai".equals(pageName) ? 1f : 0.55f);
                   aiSettingsTab.setAlpha("aiSettings".equals(pageName) ? 1f : 0.55f);
+                  backupTab.setAlpha("backup".equals(pageName) ? 1f : 0.55f);
               }
           
               private TextView text(String value, int sp, int color) {
