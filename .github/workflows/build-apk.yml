@@ -70,8 +70,8 @@ jobs:
                   applicationId "com.trae.phonehelper"
                   minSdk 26
                   targetSdk 35
-                  versionCode 2
-                  versionName "1.1"
+                  versionCode 3
+                  versionName "1.2"
               }
           }
           EOF_app_build_gradle
@@ -132,6 +132,7 @@ jobs:
           import android.os.Bundle;
           import android.os.Handler;
           import android.os.SystemClock;
+          import android.text.InputType;
           import android.os.Vibrator;
           import android.view.Gravity;
           import android.view.View;
@@ -146,6 +147,13 @@ jobs:
           import org.json.JSONArray;
           import org.json.JSONObject;
           
+          import java.io.BufferedReader;
+          import java.io.InputStream;
+          import java.io.InputStreamReader;
+          import java.io.OutputStream;
+          import java.net.HttpURLConnection;
+          import java.net.URL;
+          import java.nio.charset.StandardCharsets;
           import java.text.SimpleDateFormat;
           import java.util.Date;
           import java.util.Locale;
@@ -155,11 +163,12 @@ jobs:
               private SharedPreferences pref;
               private final Handler handler = new Handler();
           
-              private LinearLayout homePage, splitPage, textPage, linkPage, timerPage, pomoPage;
-              private LinearLayout splitResultList, savedTextList, linkList;
+              private LinearLayout homePage, splitPage, textPage, linkPage, timerPage, pomoPage, aiPage, aiSettingsPage;
+              private LinearLayout splitResultList, savedTextList, linkList, aiMessageList;
               private EditText longTextInput, splitSizeInput, titleInput, contentInput, linkTitleInput, linkUrlInput;
+              private EditText aiInput, apiUrlInput, apiKeyInput, modelInput, systemPromptInput;
               private TextView statusText, timerDisplay, pomoDisplay, pomoStateText, pomoCountText;
-              private Button homeTab, splitTab, textTab, linkTab, timerTab, pomoTab;
+              private Button homeTab, splitTab, textTab, linkTab, timerTab, pomoTab, aiTab, aiSettingsTab;
               private Button stopwatchTab, countdownTab, timerStartPause;
               private EditText timerMinuteInput, timerSecondInput, pomoFocusInput, pomoRestInput;
           
@@ -178,6 +187,9 @@ jobs:
               private long pomoElapsed = 0;
               private long pomoStartedAt = 0;
           
+              private JSONArray aiMessages = new JSONArray();
+              private boolean aiSending = false;
+          
               private final Runnable tick = new Runnable() {
                   @Override
                   public void run() {
@@ -194,6 +206,7 @@ jobs:
                   ensureDefaults();
                   restoreTimerState();
                   restorePomoState();
+                  loadAiMessages();
                   buildUi();
                   renderSavedTexts();
                   renderLinks();
@@ -228,7 +241,7 @@ jobs:
                   title.setTypeface(Typeface.DEFAULT_BOLD);
                   title.setGravity(Gravity.CENTER_HORIZONTAL);
                   root.addView(title);
-                  TextView subtitle = text("复制 · 快捷 · 计时 · 番茄钟", 14, Color.rgb(148, 163, 184));
+                  TextView subtitle = text("复制 · 快捷 · 计时 · 番茄钟 · AI", 14, Color.rgb(148, 163, 184));
                   subtitle.setGravity(Gravity.CENTER_HORIZONTAL);
                   root.addView(subtitle);
           
@@ -250,6 +263,13 @@ jobs:
                   tabs2.addView(pomoTab, weight());
                   root.addView(tabs2);
           
+                  LinearLayout tabs3 = row();
+                  aiTab = button("AI聊天");
+                  aiSettingsTab = button("AI设置");
+                  tabs3.addView(aiTab, weight());
+                  tabs3.addView(aiSettingsTab, weight());
+                  root.addView(tabs3);
+          
                   statusText = text("准备就绪", 14, Color.rgb(52, 211, 153));
                   root.addView(statusText);
           
@@ -259,12 +279,16 @@ jobs:
                   linkPage = page();
                   timerPage = page();
                   pomoPage = page();
+                  aiPage = page();
+                  aiSettingsPage = page();
                   root.addView(homePage);
                   root.addView(splitPage);
                   root.addView(textPage);
                   root.addView(linkPage);
                   root.addView(timerPage);
                   root.addView(pomoPage);
+                  root.addView(aiPage);
+                  root.addView(aiSettingsPage);
           
                   buildHomePage();
                   buildSplitPage();
@@ -272,6 +296,8 @@ jobs:
                   buildLinkPage();
                   buildTimerPage();
                   buildPomoPage();
+                  buildAiPage();
+                  buildAiSettingsPage();
           
                   homeTab.setOnClickListener(v -> showPage("home"));
                   splitTab.setOnClickListener(v -> showPage("split"));
@@ -279,6 +305,8 @@ jobs:
                   linkTab.setOnClickListener(v -> showPage("link"));
                   timerTab.setOnClickListener(v -> showPage("timer"));
                   pomoTab.setOnClickListener(v -> showPage("pomo"));
+                  aiTab.setOnClickListener(v -> showPage("ai"));
+                  aiSettingsTab.setOnClickListener(v -> showPage("aiSettings"));
           
                   setContentView(scroll);
                   showPage("home");
@@ -292,6 +320,8 @@ jobs:
                   homePage.addView(homeButton("快捷打开", "一键打开 GitHub、OpenRouter 等常用网页", "link"));
                   homePage.addView(homeButton("计时器", "正计时、倒计时和快速倒计时", "timer"));
                   homePage.addView(homeButton("番茄钟", "专注 25 分钟，休息 5 分钟，记录今日完成数", "pomo"));
+                  homePage.addView(homeButton("AI聊天", "接入 OpenAI 兼容接口，支持 openrouter/free", "ai"));
+                  homePage.addView(homeButton("AI设置", "填写 API 地址、API Key、模型名和智能体设定", "aiSettings"));
               }
           
               private View homeButton(String title, String desc, String pageName) {
@@ -460,6 +490,77 @@ jobs:
                   reset.setOnClickListener(v -> resetPomo());
                   done.setOnClickListener(v -> finishOnePomo());
                   updatePomoDisplay();
+              }
+          
+              private void buildAiPage() {
+                  aiPage.addView(sectionTitle("AI聊天"));
+                  aiPage.addView(infoCard("这里使用 OpenAI 兼容接口。首次使用请先进入 AI设置，填写 API Key。"));
+                  aiMessageList = new LinearLayout(this);
+                  aiMessageList.setOrientation(LinearLayout.VERTICAL);
+                  aiPage.addView(aiMessageList);
+          
+                  aiInput = inputBox("输入你想问 AI 的内容");
+                  aiInput.setMinLines(2);
+                  aiInput.setMaxLines(5);
+                  aiPage.addView(aiInput);
+          
+                  LinearLayout actions = row();
+                  Button send = button("发送");
+                  Button clear = button("清空");
+                  actions.addView(send, weight());
+                  actions.addView(clear, weight());
+                  aiPage.addView(actions);
+          
+                  send.setOnClickListener(v -> sendAiMessage());
+                  clear.setOnClickListener(v -> {
+                      aiMessages = new JSONArray();
+                      saveAiMessages();
+                      renderAiMessages();
+                      statusText.setText("AI 对话已清空");
+                  });
+                  renderAiMessages();
+              }
+          
+              private void buildAiSettingsPage() {
+                  aiSettingsPage.addView(sectionTitle("AI设置"));
+                  aiSettingsPage.addView(infoCard("API Key 只保存在本机，不会写进 GitHub。推荐模型名保持 openrouter/free。"));
+          
+                  apiUrlInput = inputBox("API 地址");
+                  apiUrlInput.setText(pref.getString("aiApiUrl", "https://openrouter.ai/api/v1/chat/completions"));
+                  aiSettingsPage.addView(labelWrap("API 地址", apiUrlInput));
+          
+                  apiKeyInput = inputBox("API Key");
+                  apiKeyInput.setSingleLine(true);
+                  apiKeyInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+                  apiKeyInput.setText(pref.getString("aiApiKey", ""));
+                  aiSettingsPage.addView(labelWrap("API Key", apiKeyInput));
+          
+                  modelInput = inputBox("模型名");
+                  modelInput.setSingleLine(true);
+                  modelInput.setText(pref.getString("aiModel", "openrouter/free"));
+                  aiSettingsPage.addView(labelWrap("模型名", modelInput));
+          
+                  systemPromptInput = inputBox("智能体设定");
+                  systemPromptInput.setMinLines(4);
+                  systemPromptInput.setText(pref.getString("aiSystemPrompt", "你是一个耐心、有逻辑、说中文的智能助手。回答要清晰、实用、不过度啰嗦。"));
+                  aiSettingsPage.addView(labelWrap("智能体设定", systemPromptInput));
+          
+                  LinearLayout actions = row();
+                  Button save = button("保存设置");
+                  Button test = button("测试连接");
+                  actions.addView(save, weight());
+                  actions.addView(test, weight());
+                  aiSettingsPage.addView(actions);
+          
+                  save.setOnClickListener(v -> {
+                      saveAiSettings();
+                      statusText.setText("AI 设置已保存");
+                      showPage("ai");
+                  });
+                  test.setOnClickListener(v -> {
+                      saveAiSettings();
+                      testAiConnection();
+                  });
               }
           
               private void generateChunks() {
@@ -867,6 +968,178 @@ jobs:
                   return String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds);
               }
           
+          
+              private void sendAiMessage() {
+                  String value = aiInput.getText().toString().trim();
+                  if (value.isEmpty() || aiSending) return;
+                  if (pref.getString("aiApiKey", "").trim().isEmpty()) {
+                      statusText.setText("请先在 AI设置 里填写 API Key");
+                      showPage("aiSettings");
+                      return;
+                  }
+                  appendAiMessage("user", value);
+                  aiInput.setText("");
+                  hideKeyboard();
+                  callAi(false);
+              }
+          
+              private void testAiConnection() {
+                  if (pref.getString("aiApiKey", "").trim().isEmpty()) {
+                      statusText.setText("请先填写 API Key");
+                      showPage("aiSettings");
+                      return;
+                  }
+                  appendAiMessage("user", "请用一句话回复：连接测试成功。");
+                  showPage("ai");
+                  callAi(true);
+              }
+          
+              private void callAi(boolean testMode) {
+                  aiSending = true;
+                  statusText.setText(testMode ? "正在测试 AI 连接..." : "AI 正在思考...");
+                  new Thread(() -> {
+                      try {
+                          String reply = requestAiCompletion();
+                          runOnUiThread(() -> {
+                              appendAiMessage("assistant", reply);
+                              statusText.setText("AI 回复完成");
+                              aiSending = false;
+                          });
+                      } catch (Exception e) {
+                          runOnUiThread(() -> {
+                              appendAiMessage("assistant", "请求失败：" + shortError(e.getMessage()));
+                              statusText.setText("AI 请求失败，请检查 API 设置");
+                              aiSending = false;
+                          });
+                      }
+                  }).start();
+              }
+          
+              private String requestAiCompletion() throws Exception {
+                  String apiUrl = pref.getString("aiApiUrl", "").trim();
+                  String apiKey = pref.getString("aiApiKey", "").trim();
+                  String model = pref.getString("aiModel", "openrouter/free").trim();
+                  String systemPrompt = pref.getString("aiSystemPrompt", "").trim();
+                  if (apiUrl.isEmpty()) throw new Exception("API 地址为空");
+                  if (apiKey.isEmpty()) throw new Exception("API Key 为空");
+                  if (model.isEmpty()) throw new Exception("模型名为空");
+          
+                  JSONObject body = new JSONObject();
+                  body.put("model", model);
+                  JSONArray apiMessages = new JSONArray();
+                  if (!systemPrompt.isEmpty()) {
+                      JSONObject sys = new JSONObject();
+                      sys.put("role", "system");
+                      sys.put("content", systemPrompt);
+                      apiMessages.put(sys);
+                  }
+                  int start = Math.max(0, aiMessages.length() - 16);
+                  for (int i = start; i < aiMessages.length(); i++) {
+                      apiMessages.put(aiMessages.getJSONObject(i));
+                  }
+                  body.put("messages", apiMessages);
+                  body.put("temperature", 0.7);
+          
+                  HttpURLConnection conn = (HttpURLConnection) new URL(apiUrl).openConnection();
+                  conn.setRequestMethod("POST");
+                  conn.setConnectTimeout(30000);
+                  conn.setReadTimeout(60000);
+                  conn.setDoOutput(true);
+                  conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+                  conn.setRequestProperty("Authorization", "Bearer " + apiKey);
+          
+                  try (OutputStream os = conn.getOutputStream()) {
+                      os.write(body.toString().getBytes(StandardCharsets.UTF_8));
+                  }
+          
+                  int code = conn.getResponseCode();
+                  InputStream stream = code >= 200 && code < 300 ? conn.getInputStream() : conn.getErrorStream();
+                  String response = readAll(stream);
+                  if (code < 200 || code >= 300) {
+                      throw new Exception("HTTP " + code + "：" + response);
+                  }
+          
+                  JSONObject json = new JSONObject(response);
+                  JSONArray choices = json.getJSONArray("choices");
+                  JSONObject message = choices.getJSONObject(0).getJSONObject("message");
+                  return message.optString("content", "").trim();
+              }
+          
+              private String readAll(InputStream stream) throws Exception {
+                  BufferedReader br = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8));
+                  StringBuilder sb = new StringBuilder();
+                  String line;
+                  while ((line = br.readLine()) != null) sb.append(line);
+                  return sb.toString();
+              }
+          
+              private void appendAiMessage(String role, String content) {
+                  try {
+                      JSONObject obj = new JSONObject();
+                      obj.put("role", role);
+                      obj.put("content", content);
+                      aiMessages.put(obj);
+                      saveAiMessages();
+                      renderAiMessages();
+                  } catch (Exception ignored) {}
+              }
+          
+              private void renderAiMessages() {
+                  if (aiMessageList == null) return;
+                  aiMessageList.removeAllViews();
+                  for (int i = 0; i < aiMessages.length(); i++) {
+                      try {
+                          JSONObject msg = aiMessages.getJSONObject(i);
+                          aiMessageList.addView(aiBubble(msg.optString("role"), msg.optString("content")));
+                      } catch (Exception ignored) {}
+                  }
+              }
+          
+              private TextView aiBubble(String role, String content) {
+                  boolean user = "user".equals(role);
+                  TextView tv = text((user ? "你：\n" : "助手：\n") + content, 15, Color.WHITE);
+                  GradientDrawable bg = new GradientDrawable();
+                  bg.setColor(user ? Color.rgb(14, 116, 144) : Color.rgb(30, 41, 59));
+                  bg.setCornerRadius(20);
+                  tv.setBackground(bg);
+                  tv.setPadding(18, 14, 18, 14);
+                  LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                          LinearLayout.LayoutParams.MATCH_PARENT,
+                          LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  lp.setMargins(0, 8, 0, 8);
+                  tv.setLayoutParams(lp);
+                  return tv;
+              }
+          
+              private void saveAiSettings() {
+                  pref.edit()
+                          .putString("aiApiUrl", apiUrlInput.getText().toString().trim())
+                          .putString("aiApiKey", apiKeyInput.getText().toString().trim())
+                          .putString("aiModel", modelInput.getText().toString().trim())
+                          .putString("aiSystemPrompt", systemPromptInput.getText().toString().trim())
+                          .apply();
+              }
+          
+              private void loadAiMessages() {
+                  try {
+                      aiMessages = new JSONArray(pref.getString("aiMessages", "[]"));
+                  } catch (Exception e) {
+                      aiMessages = new JSONArray();
+                  }
+              }
+          
+              private void saveAiMessages() {
+                  pref.edit().putString("aiMessages", aiMessages.toString()).apply();
+              }
+          
+              private String shortError(String value) {
+                  if (value == null) return "未知错误";
+                  String cleaned = value.replace("\n", " ").trim();
+                  if (cleaned.length() > 500) return cleaned.substring(0, 500) + "...";
+                  return cleaned;
+              }
+          
               private void copyText(String label, String value) {
                   ClipboardManager manager = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
                   if (manager != null) {
@@ -962,12 +1235,16 @@ jobs:
                   linkPage.setVisibility("link".equals(pageName) ? View.VISIBLE : View.GONE);
                   timerPage.setVisibility("timer".equals(pageName) ? View.VISIBLE : View.GONE);
                   pomoPage.setVisibility("pomo".equals(pageName) ? View.VISIBLE : View.GONE);
+                  aiPage.setVisibility("ai".equals(pageName) ? View.VISIBLE : View.GONE);
+                  aiSettingsPage.setVisibility("aiSettings".equals(pageName) ? View.VISIBLE : View.GONE);
                   homeTab.setAlpha("home".equals(pageName) ? 1f : 0.55f);
                   splitTab.setAlpha("split".equals(pageName) ? 1f : 0.55f);
                   textTab.setAlpha("text".equals(pageName) ? 1f : 0.55f);
                   linkTab.setAlpha("link".equals(pageName) ? 1f : 0.55f);
                   timerTab.setAlpha("timer".equals(pageName) ? 1f : 0.55f);
                   pomoTab.setAlpha("pomo".equals(pageName) ? 1f : 0.55f);
+                  aiTab.setAlpha("ai".equals(pageName) ? 1f : 0.55f);
+                  aiSettingsTab.setAlpha("aiSettings".equals(pageName) ? 1f : 0.55f);
               }
           
               private TextView text(String value, int sp, int color) {
