@@ -70,8 +70,8 @@ jobs:
                   applicationId "com.trae.phonehelper"
                   minSdk 26
                   targetSdk 35
-                  versionCode 1
-                  versionName "1.0"
+                  versionCode 2
+                  versionName "1.1"
               }
           }
           EOF_app_build_gradle
@@ -81,6 +81,7 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.VIBRATE" />
           
               <application
                   android:allowBackup="true"
@@ -129,6 +130,9 @@ jobs:
           import android.graphics.drawable.GradientDrawable;
           import android.net.Uri;
           import android.os.Bundle;
+          import android.os.Handler;
+          import android.os.SystemClock;
+          import android.os.Vibrator;
           import android.view.Gravity;
           import android.view.View;
           import android.view.inputmethod.InputMethodManager;
@@ -142,114 +146,186 @@ jobs:
           import org.json.JSONArray;
           import org.json.JSONObject;
           
-          import java.util.ArrayList;
-          import java.util.List;
+          import java.text.SimpleDateFormat;
+          import java.util.Date;
+          import java.util.Locale;
           
           public class MainActivity extends Activity {
               private static final String PREF = "phone_helper_pref";
               private SharedPreferences pref;
+              private final Handler handler = new Handler();
           
-              private LinearLayout splitPage;
-              private LinearLayout textPage;
-              private LinearLayout linkPage;
-              private LinearLayout splitResultList;
-              private LinearLayout savedTextList;
-              private LinearLayout linkList;
-              private EditText longTextInput;
-              private EditText splitSizeInput;
-              private EditText titleInput;
-              private EditText contentInput;
-              private EditText linkTitleInput;
-              private EditText linkUrlInput;
-              private Button splitTab;
-              private Button textTab;
-              private Button linkTab;
-              private TextView statusText;
+              private LinearLayout homePage, splitPage, textPage, linkPage, timerPage, pomoPage;
+              private LinearLayout splitResultList, savedTextList, linkList;
+              private EditText longTextInput, splitSizeInput, titleInput, contentInput, linkTitleInput, linkUrlInput;
+              private TextView statusText, timerDisplay, pomoDisplay, pomoStateText, pomoCountText;
+              private Button homeTab, splitTab, textTab, linkTab, timerTab, pomoTab;
+              private Button stopwatchTab, countdownTab, timerStartPause;
+              private EditText timerMinuteInput, timerSecondInput, pomoFocusInput, pomoRestInput;
+          
+              private String timerMode = "stopwatch";
+              private boolean stopwatchRunning = false;
+              private long stopwatchElapsed = 0;
+              private long stopwatchStartedAt = 0;
+              private boolean countdownRunning = false;
+              private long countdownDuration = 5 * 60 * 1000L;
+              private long countdownElapsed = 0;
+              private long countdownStartedAt = 0;
+          
+              private boolean pomoRunning = false;
+              private boolean pomoFocus = true;
+              private long pomoDuration = 25 * 60 * 1000L;
+              private long pomoElapsed = 0;
+              private long pomoStartedAt = 0;
+          
+              private final Runnable tick = new Runnable() {
+                  @Override
+                  public void run() {
+                      updateTimerDisplay();
+                      updatePomoDisplay();
+                      handler.postDelayed(this, 250);
+                  }
+              };
           
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
                   pref = getSharedPreferences(PREF, MODE_PRIVATE);
                   ensureDefaults();
+                  restoreTimerState();
+                  restorePomoState();
                   buildUi();
                   renderSavedTexts();
                   renderLinks();
+                  handler.post(tick);
+              }
+          
+              @Override
+              protected void onPause() {
+                  super.onPause();
+                  saveTimerState();
+                  savePomoState();
+              }
+          
+              @Override
+              protected void onDestroy() {
+                  super.onDestroy();
+                  saveTimerState();
+                  savePomoState();
+                  handler.removeCallbacks(tick);
               }
           
               private void buildUi() {
                   ScrollView scroll = new ScrollView(this);
                   scroll.setFillViewport(true);
                   scroll.setBackgroundColor(Color.rgb(7, 17, 31));
-          
                   LinearLayout root = new LinearLayout(this);
                   root.setOrientation(LinearLayout.VERTICAL);
-                  root.setPadding(28, 36, 28, 28);
+                  root.setPadding(24, 34, 24, 28);
                   scroll.addView(root);
           
                   TextView title = text("手机助手工具箱", 32, Color.WHITE);
                   title.setTypeface(Typeface.DEFAULT_BOLD);
                   title.setGravity(Gravity.CENTER_HORIZONTAL);
                   root.addView(title);
-          
-                  TextView subtitle = text("分段复制 · 常用文本 · 快捷打开", 14, Color.rgb(148, 163, 184));
+                  TextView subtitle = text("复制 · 快捷 · 计时 · 番茄钟", 14, Color.rgb(148, 163, 184));
                   subtitle.setGravity(Gravity.CENTER_HORIZONTAL);
                   root.addView(subtitle);
           
-                  LinearLayout tabs = row();
-                  splitTab = button("分段复制");
-                  textTab = button("常用文本");
-                  linkTab = button("快捷打开");
-                  tabs.addView(splitTab, weight());
-                  tabs.addView(textTab, weight());
-                  tabs.addView(linkTab, weight());
-                  root.addView(tabs);
+                  LinearLayout tabs1 = row();
+                  homeTab = button("首页");
+                  splitTab = button("复制");
+                  textTab = button("文本");
+                  tabs1.addView(homeTab, weight());
+                  tabs1.addView(splitTab, weight());
+                  tabs1.addView(textTab, weight());
+                  root.addView(tabs1);
+          
+                  LinearLayout tabs2 = row();
+                  linkTab = button("链接");
+                  timerTab = button("计时器");
+                  pomoTab = button("番茄钟");
+                  tabs2.addView(linkTab, weight());
+                  tabs2.addView(timerTab, weight());
+                  tabs2.addView(pomoTab, weight());
+                  root.addView(tabs2);
           
                   statusText = text("准备就绪", 14, Color.rgb(52, 211, 153));
                   root.addView(statusText);
           
+                  homePage = page();
                   splitPage = page();
                   textPage = page();
                   linkPage = page();
+                  timerPage = page();
+                  pomoPage = page();
+                  root.addView(homePage);
                   root.addView(splitPage);
                   root.addView(textPage);
                   root.addView(linkPage);
+                  root.addView(timerPage);
+                  root.addView(pomoPage);
           
+                  buildHomePage();
                   buildSplitPage();
                   buildTextPage();
                   buildLinkPage();
+                  buildTimerPage();
+                  buildPomoPage();
           
+                  homeTab.setOnClickListener(v -> showPage("home"));
                   splitTab.setOnClickListener(v -> showPage("split"));
                   textTab.setOnClickListener(v -> showPage("text"));
                   linkTab.setOnClickListener(v -> showPage("link"));
+                  timerTab.setOnClickListener(v -> showPage("timer"));
+                  pomoTab.setOnClickListener(v -> showPage("pomo"));
+          
                   setContentView(scroll);
-                  showPage("split");
+                  showPage("home");
+              }
+          
+              private void buildHomePage() {
+                  homePage.addView(sectionTitle("功能目录"));
+                  homePage.addView(infoCard("这是你的手机操作增强工具箱。常用复制、网址打开、计时和番茄钟都放在这里。"));
+                  homePage.addView(homeButton("分段复制", "把长代码、长提示词、工作流自动拆成多段复制", "split"));
+                  homePage.addView(homeButton("常用文本", "保存 API 地址、模型名、提交信息等常用内容", "text"));
+                  homePage.addView(homeButton("快捷打开", "一键打开 GitHub、OpenRouter 等常用网页", "link"));
+                  homePage.addView(homeButton("计时器", "正计时、倒计时和快速倒计时", "timer"));
+                  homePage.addView(homeButton("番茄钟", "专注 25 分钟，休息 5 分钟，记录今日完成数", "pomo"));
+              }
+          
+              private View homeButton(String title, String desc, String pageName) {
+                  LinearLayout card = card();
+                  TextView t = text(title, 20, Color.WHITE);
+                  t.setTypeface(Typeface.DEFAULT_BOLD);
+                  card.addView(t);
+                  card.addView(text(desc, 14, Color.LTGRAY));
+                  Button open = button("打开 " + title);
+                  open.setOnClickListener(v -> showPage(pageName));
+                  card.addView(open);
+                  return card;
               }
           
               private void buildSplitPage() {
                   splitPage.addView(sectionTitle("长文本分段复制"));
                   splitPage.addView(infoCard("把很长的代码、工作流、提示词粘到这里，App 会自动分段，每段都有复制按钮。"));
-          
                   longTextInput = inputBox("粘贴长文本");
                   longTextInput.setMinLines(8);
                   longTextInput.setGravity(Gravity.TOP);
                   splitPage.addView(longTextInput);
-          
                   splitSizeInput = inputBox("每段最大字数，默认 3000");
                   splitSizeInput.setText("3000");
                   splitSizeInput.setSingleLine(true);
                   splitPage.addView(labelWrap("分段长度", splitSizeInput));
-          
                   LinearLayout actions = row();
                   Button generate = button("生成分段");
                   Button clear = button("清空");
                   actions.addView(generate, weight());
                   actions.addView(clear, weight());
                   splitPage.addView(actions);
-          
                   splitResultList = new LinearLayout(this);
                   splitResultList.setOrientation(LinearLayout.VERTICAL);
                   splitPage.addView(splitResultList);
-          
                   generate.setOnClickListener(v -> generateChunks());
                   clear.setOnClickListener(v -> {
                       longTextInput.setText("");
@@ -261,7 +337,6 @@ jobs:
               private void buildTextPage() {
                   textPage.addView(sectionTitle("常用文本"));
                   textPage.addView(infoCard("保存常用路径、API 地址、模型名、提交信息。以后点一下就能复制。"));
-          
                   titleInput = inputBox("标题，例如 OpenRouter API 地址");
                   titleInput.setSingleLine(true);
                   contentInput = inputBox("内容");
@@ -269,36 +344,122 @@ jobs:
                   contentInput.setGravity(Gravity.TOP);
                   textPage.addView(labelWrap("标题", titleInput));
                   textPage.addView(labelWrap("内容", contentInput));
-          
                   Button add = button("添加常用文本");
                   textPage.addView(add);
-          
                   savedTextList = new LinearLayout(this);
                   savedTextList.setOrientation(LinearLayout.VERTICAL);
                   textPage.addView(savedTextList);
-          
                   add.setOnClickListener(v -> addSavedText());
               }
           
               private void buildLinkPage() {
                   linkPage.addView(sectionTitle("快捷打开"));
                   linkPage.addView(infoCard("保存常用网站，一键打开 GitHub、OpenRouter、Actions 等页面。"));
-          
                   linkTitleInput = inputBox("标题，例如 GitHub");
                   linkTitleInput.setSingleLine(true);
                   linkUrlInput = inputBox("网址，例如 https://github.com");
                   linkUrlInput.setSingleLine(true);
                   linkPage.addView(labelWrap("标题", linkTitleInput));
                   linkPage.addView(labelWrap("网址", linkUrlInput));
-          
                   Button add = button("添加快捷链接");
                   linkPage.addView(add);
-          
                   linkList = new LinearLayout(this);
                   linkList.setOrientation(LinearLayout.VERTICAL);
                   linkPage.addView(linkList);
-          
                   add.setOnClickListener(v -> addLink());
+              }
+          
+              private void buildTimerPage() {
+                  timerPage.addView(sectionTitle("计时器"));
+                  timerPage.addView(infoCard("包含正计时、倒计时和快速倒计时。适合临时计时，不替代闹钟。"));
+                  LinearLayout modeRow = row();
+                  stopwatchTab = button("正计时");
+                  countdownTab = button("倒计时");
+                  modeRow.addView(stopwatchTab, weight());
+                  modeRow.addView(countdownTab, weight());
+                  timerPage.addView(modeRow);
+                  timerDisplay = text("00:00.0", 56, Color.WHITE);
+                  timerDisplay.setGravity(Gravity.CENTER);
+                  timerDisplay.setPadding(0, 28, 0, 20);
+                  timerPage.addView(timerDisplay);
+                  LinearLayout edit = row();
+                  timerMinuteInput = inputBox("分钟");
+                  timerMinuteInput.setText("5");
+                  timerMinuteInput.setSingleLine(true);
+                  timerSecondInput = inputBox("秒");
+                  timerSecondInput.setText("0");
+                  timerSecondInput.setSingleLine(true);
+                  Button set = button("设定");
+                  edit.addView(labelWrap("分钟", timerMinuteInput), weight());
+                  edit.addView(labelWrap("秒", timerSecondInput), weight());
+                  edit.addView(set, weight());
+                  timerPage.addView(edit);
+                  LinearLayout controls = row();
+                  timerStartPause = button("开始");
+                  Button reset = button("重置");
+                  controls.addView(timerStartPause, weight());
+                  controls.addView(reset, weight());
+                  timerPage.addView(controls);
+                  LinearLayout quick1 = row();
+                  quick1.addView(quickTimerButton("1 分钟", 1), weight());
+                  quick1.addView(quickTimerButton("3 分钟", 3), weight());
+                  timerPage.addView(quick1);
+                  LinearLayout quick2 = row();
+                  quick2.addView(quickTimerButton("5 分钟", 5), weight());
+                  quick2.addView(quickTimerButton("10 分钟", 10), weight());
+                  timerPage.addView(quick2);
+                  stopwatchTab.setOnClickListener(v -> {
+                      timerMode = "stopwatch";
+                      updateTimerDisplay();
+                      saveTimerState();
+                  });
+                  countdownTab.setOnClickListener(v -> {
+                      timerMode = "countdown";
+                      updateTimerDisplay();
+                      saveTimerState();
+                  });
+                  set.setOnClickListener(v -> setCountdownFromInput());
+                  timerStartPause.setOnClickListener(v -> toggleTimer());
+                  reset.setOnClickListener(v -> resetTimer());
+              }
+          
+              private void buildPomoPage() {
+                  pomoPage.addView(sectionTitle("番茄钟"));
+                  pomoPage.addView(infoCard("默认专注 25 分钟、休息 5 分钟。适合学习节奏管理。"));
+                  pomoStateText = text("准备开始专注", 18, Color.rgb(125, 211, 252));
+                  pomoStateText.setGravity(Gravity.CENTER);
+                  pomoPage.addView(pomoStateText);
+                  pomoDisplay = text("25:00", 60, Color.WHITE);
+                  pomoDisplay.setGravity(Gravity.CENTER);
+                  pomoPage.addView(pomoDisplay);
+                  pomoCountText = text("今日完成 0 个番茄", 16, Color.rgb(52, 211, 153));
+                  pomoCountText.setGravity(Gravity.CENTER);
+                  pomoPage.addView(pomoCountText);
+                  LinearLayout edit = row();
+                  pomoFocusInput = inputBox("专注分钟");
+                  pomoFocusInput.setText("25");
+                  pomoFocusInput.setSingleLine(true);
+                  pomoRestInput = inputBox("休息分钟");
+                  pomoRestInput.setText("5");
+                  pomoRestInput.setSingleLine(true);
+                  Button apply = button("应用");
+                  edit.addView(labelWrap("专注", pomoFocusInput), weight());
+                  edit.addView(labelWrap("休息", pomoRestInput), weight());
+                  edit.addView(apply, weight());
+                  pomoPage.addView(edit);
+                  LinearLayout controls = row();
+                  Button startPause = button("开始/暂停");
+                  Button reset = button("重置");
+                  Button done = button("完成一个");
+                  controls.addView(startPause, weight());
+                  controls.addView(reset, weight());
+                  controls.addView(done, weight());
+                  pomoPage.addView(controls);
+                  apply.setOnClickListener(v -> applyPomoSettings());
+                  startPause.setOnClickListener(v -> togglePomo());
+                  reset.setOnClickListener(v -> resetPomo());
+                  done.setOnClickListener(v -> finishOnePomo());
+                  updatePomoDisplay();
               }
           
               private void generateChunks() {
@@ -310,7 +471,6 @@ jobs:
                   int size = parseInt(splitSizeInput.getText().toString(), 3000);
                   size = Math.max(500, Math.min(10000, size));
                   splitSizeInput.setText(String.valueOf(size));
-          
                   splitResultList.removeAllViews();
                   int count = 0;
                   for (int start = 0; start < source.length(); start += size) {
@@ -328,8 +488,7 @@ jobs:
                   TextView title = text(String.format("第 %02d 段 · %d 字", index, chunk.length()), 18, Color.WHITE);
                   title.setTypeface(Typeface.DEFAULT_BOLD);
                   card.addView(title);
-                  TextView preview = text(preview(chunk), 14, Color.LTGRAY);
-                  card.addView(preview);
+                  card.addView(text(preview(chunk), 14, Color.LTGRAY));
                   Button copy = button("复制第 " + String.format("%02d", index) + " 段");
                   copy.setOnClickListener(v -> copyText("第 " + index + " 段", chunk));
                   card.addView(copy);
@@ -350,8 +509,7 @@ jobs:
                       obj.put("content", content);
                       array.put(obj);
                       saveArray("texts", array);
-                  } catch (Exception ignored) {
-                  }
+                  } catch (Exception ignored) {}
                   titleInput.setText("");
                   contentInput.setText("");
                   renderSavedTexts();
@@ -367,8 +525,7 @@ jobs:
                       try {
                           JSONObject obj = array.getJSONObject(i);
                           savedTextList.addView(savedTextCard(i, obj.optString("title"), obj.optString("content")));
-                      } catch (Exception ignored) {
-                      }
+                      } catch (Exception ignored) {}
                   }
               }
           
@@ -400,9 +557,7 @@ jobs:
                       toast("标题和网址都要填写");
                       return;
                   }
-                  if (!url.startsWith("http://") && !url.startsWith("https://")) {
-                      url = "https://" + url;
-                  }
+                  if (!url.startsWith("http://") && !url.startsWith("https://")) url = "https://" + url;
                   JSONArray array = loadArray("links");
                   try {
                       JSONObject obj = new JSONObject();
@@ -410,8 +565,7 @@ jobs:
                       obj.put("url", url);
                       array.put(obj);
                       saveArray("links", array);
-                  } catch (Exception ignored) {
-                  }
+                  } catch (Exception ignored) {}
                   linkTitleInput.setText("");
                   linkUrlInput.setText("");
                   renderLinks();
@@ -427,8 +581,7 @@ jobs:
                       try {
                           JSONObject obj = array.getJSONObject(i);
                           linkList.addView(linkCard(i, obj.optString("title"), obj.optString("url")));
-                      } catch (Exception ignored) {
-                      }
+                      } catch (Exception ignored) {}
                   }
               }
           
@@ -454,6 +607,264 @@ jobs:
                   actions.addView(delete, weight());
                   card.addView(actions);
                   return card;
+              }
+          
+              private Button quickTimerButton(String label, int minutes) {
+                  Button b = button(label);
+                  b.setOnClickListener(v -> {
+                      timerMode = "countdown";
+                      countdownDuration = minutes * 60 * 1000L;
+                      countdownElapsed = 0;
+                      countdownRunning = false;
+                      updateTimerDisplay();
+                      saveTimerState();
+                  });
+                  return b;
+              }
+          
+              private void setCountdownFromInput() {
+                  int minutes = parseInt(timerMinuteInput.getText().toString(), 5);
+                  int seconds = Math.max(0, Math.min(59, parseInt(timerSecondInput.getText().toString(), 0)));
+                  countdownDuration = Math.max(1000L, (minutes * 60L + seconds) * 1000L);
+                  countdownElapsed = 0;
+                  countdownRunning = false;
+                  timerMode = "countdown";
+                  updateTimerDisplay();
+                  saveTimerState();
+              }
+          
+              private void toggleTimer() {
+                  if ("stopwatch".equals(timerMode)) {
+                      if (stopwatchRunning) {
+                          stopwatchElapsed = getStopwatchElapsed();
+                          stopwatchRunning = false;
+                      } else {
+                          stopwatchRunning = true;
+                          stopwatchStartedAt = SystemClock.elapsedRealtime();
+                      }
+                  } else {
+                      if (countdownRunning) {
+                          countdownElapsed = getCountdownElapsed();
+                          countdownRunning = false;
+                      } else {
+                          if (getCountdownRemaining() <= 0) countdownElapsed = 0;
+                          countdownRunning = true;
+                          countdownStartedAt = SystemClock.elapsedRealtime();
+                      }
+                  }
+                  updateTimerDisplay();
+                  saveTimerState();
+              }
+          
+              private void resetTimer() {
+                  if ("stopwatch".equals(timerMode)) {
+                      stopwatchRunning = false;
+                      stopwatchElapsed = 0;
+                  } else {
+                      countdownRunning = false;
+                      countdownElapsed = 0;
+                  }
+                  updateTimerDisplay();
+                  saveTimerState();
+              }
+          
+              private long getStopwatchElapsed() {
+                  return stopwatchRunning ? stopwatchElapsed + SystemClock.elapsedRealtime() - stopwatchStartedAt : stopwatchElapsed;
+              }
+          
+              private long getCountdownElapsed() {
+                  return countdownRunning ? Math.min(countdownDuration, countdownElapsed + SystemClock.elapsedRealtime() - countdownStartedAt) : countdownElapsed;
+              }
+          
+              private long getCountdownRemaining() {
+                  return Math.max(0, countdownDuration - getCountdownElapsed());
+              }
+          
+              private void updateTimerDisplay() {
+                  if (timerDisplay == null) return;
+                  if (countdownRunning && getCountdownRemaining() <= 0) {
+                      countdownRunning = false;
+                      countdownElapsed = countdownDuration;
+                      buzz();
+                      statusText.setText("倒计时结束");
+                  }
+                  boolean stopwatch = "stopwatch".equals(timerMode);
+                  stopwatchTab.setAlpha(stopwatch ? 1f : 0.55f);
+                  countdownTab.setAlpha(stopwatch ? 0.55f : 1f);
+                  if (stopwatch) {
+                      timerDisplay.setText(formatTenths(getStopwatchElapsed()));
+                      timerStartPause.setText(stopwatchRunning ? "暂停" : getStopwatchElapsed() > 0 ? "继续" : "开始");
+                  } else {
+                      timerDisplay.setText(formatTenths(getCountdownRemaining()));
+                      timerStartPause.setText(countdownRunning ? "暂停" : getCountdownElapsed() > 0 && getCountdownRemaining() > 0 ? "继续" : "开始");
+                  }
+              }
+          
+              private void applyPomoSettings() {
+                  int focusMin = Math.max(1, Math.min(180, parseInt(pomoFocusInput.getText().toString(), 25)));
+                  int restMin = Math.max(1, Math.min(60, parseInt(pomoRestInput.getText().toString(), 5)));
+                  pref.edit().putInt("pomoFocusMin", focusMin).putInt("pomoRestMin", restMin).apply();
+                  pomoFocus = true;
+                  pomoRunning = false;
+                  pomoDuration = focusMin * 60 * 1000L;
+                  pomoElapsed = 0;
+                  updatePomoDisplay();
+                  statusText.setText("番茄钟设置已应用");
+              }
+          
+              private void togglePomo() {
+                  if (pomoRunning) {
+                      pomoElapsed = getPomoElapsed();
+                      pomoRunning = false;
+                  } else {
+                      if (getPomoRemaining() <= 0) pomoElapsed = 0;
+                      pomoRunning = true;
+                      pomoStartedAt = SystemClock.elapsedRealtime();
+                  }
+                  updatePomoDisplay();
+                  savePomoState();
+              }
+          
+              private void resetPomo() {
+                  pomoRunning = false;
+                  pomoFocus = true;
+                  pomoDuration = pref.getInt("pomoFocusMin", 25) * 60 * 1000L;
+                  pomoElapsed = 0;
+                  updatePomoDisplay();
+                  savePomoState();
+              }
+          
+              private void finishOnePomo() {
+                  increasePomoCount();
+                  pomoFocus = false;
+                  pomoRunning = false;
+                  pomoDuration = pref.getInt("pomoRestMin", 5) * 60 * 1000L;
+                  pomoElapsed = 0;
+                  updatePomoDisplay();
+                  savePomoState();
+                  statusText.setText("已记录完成 1 个番茄");
+              }
+          
+              private long getPomoElapsed() {
+                  return pomoRunning ? Math.min(pomoDuration, pomoElapsed + SystemClock.elapsedRealtime() - pomoStartedAt) : pomoElapsed;
+              }
+          
+              private long getPomoRemaining() {
+                  return Math.max(0, pomoDuration - getPomoElapsed());
+              }
+          
+              private void updatePomoDisplay() {
+                  if (pomoDisplay == null) return;
+                  if (pomoRunning && getPomoRemaining() <= 0) {
+                      pomoRunning = false;
+                      pomoElapsed = pomoDuration;
+                      buzz();
+                      if (pomoFocus) {
+                          increasePomoCount();
+                          pomoFocus = false;
+                          pomoDuration = pref.getInt("pomoRestMin", 5) * 60 * 1000L;
+                          pomoElapsed = 0;
+                          statusText.setText("专注完成，开始休息吧");
+                      } else {
+                          pomoFocus = true;
+                          pomoDuration = pref.getInt("pomoFocusMin", 25) * 60 * 1000L;
+                          pomoElapsed = 0;
+                          statusText.setText("休息结束，可以开始下一轮");
+                      }
+                  }
+                  pomoDisplay.setText(formatMinutes(getPomoRemaining()));
+                  pomoStateText.setText((pomoFocus ? "专注" : "休息") + (pomoRunning ? "中" : "已暂停/待开始"));
+                  pomoCountText.setText("今日完成 " + getTodayPomoCount() + " 个番茄");
+              }
+          
+              private void increasePomoCount() {
+                  String today = today();
+                  String savedDay = pref.getString("pomoDay", "");
+                  int count = today.equals(savedDay) ? pref.getInt("pomoCount", 0) : 0;
+                  pref.edit().putString("pomoDay", today).putInt("pomoCount", count + 1).apply();
+              }
+          
+              private int getTodayPomoCount() {
+                  String today = today();
+                  return today.equals(pref.getString("pomoDay", "")) ? pref.getInt("pomoCount", 0) : 0;
+              }
+          
+              private String today() {
+                  return new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+              }
+          
+              private void restoreTimerState() {
+                  timerMode = pref.getString("timerMode", "stopwatch");
+                  stopwatchElapsed = pref.getLong("stopwatchElapsed", 0);
+                  stopwatchRunning = pref.getBoolean("stopwatchRunning", false);
+                  countdownDuration = pref.getLong("countdownDuration", 5 * 60 * 1000L);
+                  countdownElapsed = pref.getLong("countdownElapsed", 0);
+                  countdownRunning = pref.getBoolean("countdownRunning", false);
+                  long savedAt = pref.getLong("timerSavedAt", SystemClock.elapsedRealtime());
+                  long delta = Math.max(0, SystemClock.elapsedRealtime() - savedAt);
+                  if (stopwatchRunning) {
+                      stopwatchElapsed += delta;
+                      stopwatchStartedAt = SystemClock.elapsedRealtime();
+                  }
+                  if (countdownRunning) {
+                      countdownElapsed = Math.min(countdownDuration, countdownElapsed + delta);
+                      if (countdownElapsed >= countdownDuration) countdownRunning = false;
+                      countdownStartedAt = SystemClock.elapsedRealtime();
+                  }
+              }
+          
+              private void saveTimerState() {
+                  pref.edit()
+                          .putString("timerMode", timerMode)
+                          .putLong("stopwatchElapsed", getStopwatchElapsed())
+                          .putBoolean("stopwatchRunning", stopwatchRunning)
+                          .putLong("countdownDuration", countdownDuration)
+                          .putLong("countdownElapsed", getCountdownElapsed())
+                          .putBoolean("countdownRunning", countdownRunning)
+                          .putLong("timerSavedAt", SystemClock.elapsedRealtime())
+                          .apply();
+              }
+          
+              private void restorePomoState() {
+                  int focusMin = pref.getInt("pomoFocusMin", 25);
+                  int restMin = pref.getInt("pomoRestMin", 5);
+                  pomoFocus = pref.getBoolean("pomoFocus", true);
+                  pomoDuration = pref.getLong("pomoDuration", (pomoFocus ? focusMin : restMin) * 60 * 1000L);
+                  pomoElapsed = pref.getLong("pomoElapsed", 0);
+                  pomoRunning = pref.getBoolean("pomoRunning", false);
+                  long savedAt = pref.getLong("pomoSavedAt", SystemClock.elapsedRealtime());
+                  long delta = Math.max(0, SystemClock.elapsedRealtime() - savedAt);
+                  if (pomoRunning) {
+                      pomoElapsed = Math.min(pomoDuration, pomoElapsed + delta);
+                      if (pomoElapsed >= pomoDuration) pomoRunning = false;
+                      pomoStartedAt = SystemClock.elapsedRealtime();
+                  }
+              }
+          
+              private void savePomoState() {
+                  pref.edit()
+                          .putBoolean("pomoFocus", pomoFocus)
+                          .putLong("pomoDuration", pomoDuration)
+                          .putLong("pomoElapsed", getPomoElapsed())
+                          .putBoolean("pomoRunning", pomoRunning)
+                          .putLong("pomoSavedAt", SystemClock.elapsedRealtime())
+                          .apply();
+              }
+          
+              private String formatTenths(long ms) {
+                  long tenths = Math.max(0, ms) / 100;
+                  long tenth = tenths % 10;
+                  long totalSeconds = tenths / 10;
+                  long seconds = totalSeconds % 60;
+                  long minutes = totalSeconds / 60;
+                  return String.format(Locale.getDefault(), "%02d:%02d.%d", minutes, seconds, tenth);
+              }
+          
+              private String formatMinutes(long ms) {
+                  long totalSeconds = Math.max(0, ms + 999) / 1000;
+                  long seconds = totalSeconds % 60;
+                  long minutes = totalSeconds / 60;
+                  return String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds);
               }
           
               private void copyText(String label, String value) {
@@ -490,6 +901,8 @@ jobs:
                               .putString("texts", texts.toString())
                               .putString("links", links.toString())
                               .putBoolean("defaultsReady", true)
+                              .putInt("pomoFocusMin", 25)
+                              .putInt("pomoRestMin", 5)
                               .apply();
                   }
               }
@@ -500,8 +913,7 @@ jobs:
                       obj.put("title", title);
                       obj.put("content", content);
                       array.put(obj);
-                  } catch (Exception ignored) {
-                  }
+                  } catch (Exception ignored) {}
               }
           
               private void addDefaultLink(JSONArray array, String title, String url) {
@@ -510,8 +922,7 @@ jobs:
                       obj.put("title", title);
                       obj.put("url", url);
                       array.put(obj);
-                  } catch (Exception ignored) {
-                  }
+                  } catch (Exception ignored) {}
               }
           
               private JSONArray loadArray(String key) {
@@ -533,8 +944,7 @@ jobs:
                       if (i == index) continue;
                       try {
                           result.put(source.getJSONObject(i));
-                      } catch (Exception ignored) {
-                      }
+                      } catch (Exception ignored) {}
                   }
                   saveArray(key, result);
               }
@@ -545,13 +955,19 @@ jobs:
                   return cleaned.substring(0, 120) + "...";
               }
           
-              private void showPage(String page) {
-                  splitPage.setVisibility("split".equals(page) ? View.VISIBLE : View.GONE);
-                  textPage.setVisibility("text".equals(page) ? View.VISIBLE : View.GONE);
-                  linkPage.setVisibility("link".equals(page) ? View.VISIBLE : View.GONE);
-                  splitTab.setAlpha("split".equals(page) ? 1f : 0.55f);
-                  textTab.setAlpha("text".equals(page) ? 1f : 0.55f);
-                  linkTab.setAlpha("link".equals(page) ? 1f : 0.55f);
+              private void showPage(String pageName) {
+                  homePage.setVisibility("home".equals(pageName) ? View.VISIBLE : View.GONE);
+                  splitPage.setVisibility("split".equals(pageName) ? View.VISIBLE : View.GONE);
+                  textPage.setVisibility("text".equals(pageName) ? View.VISIBLE : View.GONE);
+                  linkPage.setVisibility("link".equals(pageName) ? View.VISIBLE : View.GONE);
+                  timerPage.setVisibility("timer".equals(pageName) ? View.VISIBLE : View.GONE);
+                  pomoPage.setVisibility("pomo".equals(pageName) ? View.VISIBLE : View.GONE);
+                  homeTab.setAlpha("home".equals(pageName) ? 1f : 0.55f);
+                  splitTab.setAlpha("split".equals(pageName) ? 1f : 0.55f);
+                  textTab.setAlpha("text".equals(pageName) ? 1f : 0.55f);
+                  linkTab.setAlpha("link".equals(pageName) ? 1f : 0.55f);
+                  timerTab.setAlpha("timer".equals(pageName) ? 1f : 0.55f);
+                  pomoTab.setAlpha("pomo".equals(pageName) ? 1f : 0.55f);
               }
           
               private TextView text(String value, int sp, int color) {
@@ -584,7 +1000,7 @@ jobs:
               private Button button(String value) {
                   Button b = new Button(this);
                   b.setText(value);
-                  b.setTextSize(15);
+                  b.setTextSize(14);
                   b.setAllCaps(false);
                   b.setTextColor(Color.WHITE);
                   GradientDrawable bg = new GradientDrawable(
@@ -669,8 +1085,14 @@ jobs:
                       InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
                       View view = getCurrentFocus();
                       if (imm != null && view != null) imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
-                  } catch (Exception ignored) {
-                  }
+                  } catch (Exception ignored) {}
+              }
+          
+              private void buzz() {
+                  try {
+                      Vibrator vibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
+                      if (vibrator != null) vibrator.vibrate(600);
+                  } catch (Exception ignored) {}
               }
           
               private void toast(String value) {
