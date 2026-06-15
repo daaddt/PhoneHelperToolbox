@@ -70,8 +70,8 @@ jobs:
                   applicationId "com.trae.phonehelper"
                   minSdk 26
                   targetSdk 35
-                  versionCode 27
-                  versionName "1.8.3"
+                  versionCode 29
+                  versionName "1.8.5"
               }
           }
           TRAE_FILE_app_build_gradle
@@ -1282,15 +1282,18 @@ jobs:
                   new Thread(() -> {
                       try {
                           String reply = requestAiCompletionStream(requestBody, delta -> runOnUiThread(() -> {
-                              if (streamingAssistantIndex >= 0) {
+                              if (streamingAssistantIndex >= 0 && !delta.trim().isEmpty()) {
                                   updateAiMessage(streamingAssistantIndex, "assistant", delta);
                               }
                           }));
                           runOnUiThread(() -> {
+                              String safeReply = reply == null ? "" : reply.trim();
                               if (streamingAssistantIndex >= 0) {
-                                  updateAiMessage(streamingAssistantIndex, "assistant", reply);
+                                  if (!safeReply.isEmpty()) {
+                                      updateAiMessage(streamingAssistantIndex, "assistant", reply);
+                                  }
                               } else {
-                                  appendAiMessage("assistant", reply);
+                                  appendAiMessage("assistant", safeReply.isEmpty() ? "AI 回复完成，但没有收到可显示内容。" : reply);
                               }
                               showStatus("AI 回复完成");
                               aiSending = false;
@@ -1398,16 +1401,16 @@ jobs:
                           if (!piece.isEmpty()) {
                               full.append(piece);
                               long now = SystemClock.elapsedRealtime();
-                              if (now - lastUiUpdate > 140) {
+                              if (now - lastUiUpdate > 120) {
                                   callback.onDelta(full.toString());
                                   lastUiUpdate = now;
                               }
                           }
                       } catch (Exception ignored) {}
                   }
-                  String result = full.toString().trim();
-                  if (!result.isEmpty()) callback.onDelta(result);
-                  if (!result.isEmpty()) return result;
+                  String result = full.toString();
+                  if (!result.trim().isEmpty()) callback.onDelta(result);
+                  if (!result.trim().isEmpty()) return result;
                   String normal = raw.toString().trim();
                   if (normal.startsWith("{")) return parseNormalAiResponse(normal);
           
@@ -1499,14 +1502,11 @@ jobs:
                   LinearLayout wrap = new LinearLayout(this);
                   wrap.setOrientation(LinearLayout.VERTICAL);
                   TextView tv = text((user ? "你：\n" : "助手：\n") + content, 15, Color.WHITE);
-                  tv.setIncludeFontPadding(false);
                   GradientDrawable bg = new GradientDrawable();
                   bg.setColor(user ? Color.rgb(14, 116, 144) : Color.rgb(30, 41, 59));
                   bg.setCornerRadius(20);
                   tv.setBackground(bg);
                   tv.setPadding(18, 14, 18, 14);
-                  tv.setClipToOutline(true);
-                  tv.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
                   wrap.addView(tv);
                   if (!streaming) {
                       Button copy = button(user ? "复制我的消息" : "复制 AI 回复");
