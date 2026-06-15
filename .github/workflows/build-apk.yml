@@ -70,8 +70,8 @@ jobs:
                   applicationId "com.trae.phonehelper"
                   minSdk 26
                   targetSdk 35
-                  versionCode 16
-                  versionName "1.6.3"
+                  versionCode 17
+                  versionName "1.6.4"
               }
           }
           EOF_app_build_gradle
@@ -251,7 +251,7 @@ jobs:
                   rootScroll.setBackgroundColor(Color.rgb(7, 17, 31));
                   rootContainer = new LinearLayout(this);
                   rootContainer.setOrientation(LinearLayout.VERTICAL);
-                  rootContainer.setPadding(24, 78, 24, rootBaseBottomPadding);
+                  rootContainer.setPadding(24, 120, 24, rootBaseBottomPadding);
                   rootScroll.addView(rootContainer);
           
                   statusText = text("", 14, Color.rgb(52, 211, 153));
@@ -650,11 +650,9 @@ jobs:
                       longTextInput.setText(content);
                       splitResultList.removeAllViews();
                       showStatus("已导入文件，共 " + content.length() + " 字");
-                      toast("导入成功");
                       showPage("split");
                   } catch (Exception e) {
                       showStatus("导入失败：" + shortError(e.getMessage()));
-                      toast("导入失败");
                   }
               }
           
@@ -670,10 +668,8 @@ jobs:
                       backup.put("links", loadArray("links"));
                       outputStream.write(backup.toString(2).getBytes(StandardCharsets.UTF_8));
                       showStatus("备份已导出");
-                      toast("导出成功");
                   } catch (Exception e) {
                       showStatus("导出失败：" + shortError(e.getMessage()));
-                      toast("导出失败");
                   }
               }
           
@@ -695,10 +691,8 @@ jobs:
                       renderSavedTexts();
                       renderLinks();
                       showStatus("备份已导入");
-                      toast("导入成功");
                   } catch (Exception e) {
                       showStatus("导入失败：" + shortError(e.getMessage()));
-                      toast("导入失败");
                   }
               }
           
@@ -1389,7 +1383,6 @@ jobs:
                   if (manager != null) {
                       manager.setPrimaryClip(ClipData.newPlainText(label, value));
                       showStatus("已复制：" + label);
-                      toast("已复制");
                   }
               }
           
@@ -1504,11 +1497,7 @@ jobs:
               }
           
               private void showStatus(String message) {
-                  if (statusText == null) return;
-                  statusText.setText(message);
-                  statusText.setVisibility(View.VISIBLE);
-                  handler.removeCallbacks(hideStatusRunnable);
-                  handler.postDelayed(hideStatusRunnable, 2600);
+                  toast(message);
               }
           
               private void hideStatus() {
