@@ -70,8 +70,8 @@ jobs:
                   applicationId "com.trae.phonehelper"
                   minSdk 26
                   targetSdk 35
-                  versionCode 6
-                  versionName "1.4.1"
+                  versionCode 9
+                  versionName "1.4.4"
               }
           }
           EOF_app_build_gradle
@@ -91,7 +91,8 @@ jobs:
                   android:supportsRtl="true">
                   <activity
                       android:name=".MainActivity"
-                      android:exported="true">
+                      android:exported="true"
+                      android:windowSoftInputMode="adjustResize">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
                           <category android:name="android.intent.category.LAUNCHER" />
@@ -138,6 +139,7 @@ jobs:
           import android.view.View;
           import android.view.inputmethod.InputMethodManager;
           import android.widget.Button;
+          import android.widget.CheckBox;
           import android.widget.EditText;
           import android.widget.LinearLayout;
           import android.widget.ScrollView;
@@ -172,7 +174,8 @@ jobs:
               private EditText aiInput, apiUrlInput, apiKeyInput, modelInput, systemPromptInput;
               private TextView statusText, timerDisplay, pomoDisplay, pomoStateText, pomoCountText;
               private Button homeTab, splitTab, textTab, linkTab, timerTab, pomoTab, aiTab, aiSettingsTab, backupTab;
-              private Button stopwatchTab, countdownTab, timerStartPause;
+              private Button stopwatchTab, countdownTab, timerStartPause, aiSendButton;
+              private CheckBox pomoLoopCheck;
               private EditText timerMinuteInput, timerSecondInput, pomoFocusInput, pomoRestInput;
           
               private String timerMode = "stopwatch";
@@ -481,6 +484,12 @@ jobs:
                   pomoCountText = text("今日完成 0 个番茄", 16, Color.rgb(52, 211, 153));
                   pomoCountText.setGravity(Gravity.CENTER);
                   pomoPage.addView(pomoCountText);
+                  pomoLoopCheck = new CheckBox(this);
+                  pomoLoopCheck.setText("休息结束后自动进入下一轮专注");
+                  pomoLoopCheck.setTextColor(Color.WHITE);
+                  pomoLoopCheck.setTextSize(16);
+                  pomoLoopCheck.setChecked(pref.getBoolean("pomoLoop", true));
+                  pomoPage.addView(pomoLoopCheck);
                   LinearLayout edit = row();
                   pomoFocusInput = inputBox("专注分钟");
                   pomoFocusInput.setText("25");
@@ -505,6 +514,10 @@ jobs:
                   startPause.setOnClickListener(v -> togglePomo());
                   reset.setOnClickListener(v -> resetPomo());
                   done.setOnClickListener(v -> finishOnePomo());
+                  pomoLoopCheck.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                      pref.edit().putBoolean("pomoLoop", isChecked).apply();
+                      statusText.setText(isChecked ? "休息结束后会自动进入下一轮专注" : "休息结束后会暂停，等待手动开始");
+                  });
                   updatePomoDisplay();
               }
           
@@ -521,13 +534,13 @@ jobs:
                   aiPage.addView(aiInput);
           
                   LinearLayout actions = row();
-                  Button send = button("发送");
+                  aiSendButton = button("发送");
                   Button clear = button("清空");
-                  actions.addView(send, weight());
+                  actions.addView(aiSendButton, weight());
                   actions.addView(clear, weight());
                   aiPage.addView(actions);
           
-                  send.setOnClickListener(v -> sendAiMessage());
+                  aiSendButton.setOnClickListener(v -> sendAiMessage());
                   clear.setOnClickListener(v -> {
                       aiMessages = new JSONArray();
                       saveAiMessages();
@@ -947,7 +960,11 @@ jobs:
               private void applyPomoSettings() {
                   int focusMin = Math.max(1, Math.min(180, parseInt(pomoFocusInput.getText().toString(), 25)));
                   int restMin = Math.max(1, Math.min(60, parseInt(pomoRestInput.getText().toString(), 5)));
-                  pref.edit().putInt("pomoFocusMin", focusMin).putInt("pomoRestMin", restMin).apply();
+                  pref.edit()
+                          .putInt("pomoFocusMin", focusMin)
+                          .putInt("pomoRestMin", restMin)
+                          .putBoolean("pomoLoop", pomoLoopCheck == null || pomoLoopCheck.isChecked())
+                          .apply();
                   pomoFocus = true;
                   pomoRunning = false;
                   pomoDuration = focusMin * 60 * 1000L;
@@ -1000,7 +1017,6 @@ jobs:
               private void updatePomoDisplay() {
                   if (pomoDisplay == null) return;
                   if (pomoRunning && getPomoRemaining() <= 0) {
-                      pomoRunning = false;
                       pomoElapsed = pomoDuration;
                       buzz();
                       if (pomoFocus) {
@@ -1008,13 +1024,19 @@ jobs:
                           pomoFocus = false;
                           pomoDuration = pref.getInt("pomoRestMin", 5) * 60 * 1000L;
                           pomoElapsed = 0;
+                          pomoRunning = true;
+                          pomoStartedAt = SystemClock.elapsedRealtime();
                           statusText.setText("专注完成，开始休息吧");
                       } else {
+                          boolean autoLoop = pref.getBoolean("pomoLoop", true);
                           pomoFocus = true;
                           pomoDuration = pref.getInt("pomoFocusMin", 25) * 60 * 1000L;
                           pomoElapsed = 0;
-                          statusText.setText("休息结束，可以开始下一轮");
+                          pomoRunning = autoLoop;
+                          if (autoLoop) pomoStartedAt = SystemClock.elapsedRealtime();
+                          statusText.setText(autoLoop ? "休息结束，已开始下一轮专注" : "休息结束，等待手动开始下一轮");
                       }
+                      savePomoState();
                   }
                   pomoDisplay.setText(formatMinutes(getPomoRemaining()));
                   pomoStateText.setText((pomoFocus ? "专注" : "休息") + (pomoRunning ? "中" : "已暂停/待开始"));
@@ -1139,6 +1161,7 @@ jobs:
           
               private void callAi(boolean testMode) {
                   aiSending = true;
+                  updateAiSendingUi();
                   statusText.setText(testMode ? "正在测试 AI 连接..." : "AI 正在思考...");
                   new Thread(() -> {
                       try {
@@ -1147,15 +1170,24 @@ jobs:
                               appendAiMessage("assistant", reply);
                               statusText.setText("AI 回复完成");
                               aiSending = false;
+                              updateAiSendingUi();
                           });
                       } catch (Exception e) {
                           runOnUiThread(() -> {
                               appendAiMessage("assistant", "请求失败：" + shortError(e.getMessage()));
                               statusText.setText("AI 请求失败，请检查 API 设置");
                               aiSending = false;
+                              updateAiSendingUi();
                           });
                       }
                   }).start();
+              }
+          
+              private void updateAiSendingUi() {
+                  if (aiSendButton == null) return;
+                  aiSendButton.setEnabled(!aiSending);
+                  aiSendButton.setText(aiSending ? "发送中..." : "发送");
+                  aiSendButton.setAlpha(aiSending ? 0.55f : 1f);
               }
           
               private String requestAiCompletion() throws Exception {
@@ -1467,6 +1499,14 @@ jobs:
                   bg.setCornerRadius(18);
                   e.setBackground(bg);
                   e.setPadding(16, 12, 16, 12);
+                  e.setOnFocusChangeListener((view, hasFocus) -> {
+                      if (hasFocus) {
+                          view.postDelayed(() -> view.requestRectangleOnScreen(
+                                  new android.graphics.Rect(0, 0, view.getWidth(), view.getHeight() + 240),
+                                  true
+                          ), 250);
+                      }
+                  });
                   return e;
               }
           
