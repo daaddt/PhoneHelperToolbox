@@ -70,8 +70,8 @@ jobs:
                   applicationId "com.trae.phonehelper"
                   minSdk 26
                   targetSdk 35
-                  versionCode 12
-                  versionName "1.5.1"
+                  versionCode 13
+                  versionName "1.6"
               }
           }
           EOF_app_build_gradle
@@ -177,7 +177,7 @@ jobs:
               private EditText longTextInput, splitSizeInput, titleInput, contentInput, linkTitleInput, linkUrlInput;
               private EditText aiInput, apiUrlInput, apiKeyInput, modelInput, systemPromptInput;
               private TextView statusText, timerDisplay, pomoDisplay, pomoStateText, pomoCountText;
-              private Button stopwatchTab, countdownTab, timerStartPause, aiSendButton;
+              private Button stopwatchTab, countdownTab, timerStartPause, aiSendButton, textSaveButton, linkSaveButton, textCancelEditButton, linkCancelEditButton;
               private CheckBox pomoLoopCheck;
               private EditText timerMinuteInput, timerSecondInput, pomoFocusInput, pomoRestInput;
           
@@ -200,6 +200,8 @@ jobs:
               private boolean aiSending = false;
               private int rootBaseBottomPadding = 28;
               private String currentPage = "home";
+              private int editingTextIndex = -1;
+              private int editingLinkIndex = -1;
           
               private final Runnable tick = new Runnable() {
                   @Override
@@ -370,12 +372,16 @@ jobs:
                   contentInput.setGravity(Gravity.TOP);
                   textPage.addView(labelWrap("标题", titleInput));
                   textPage.addView(labelWrap("内容", contentInput));
-                  Button add = button("添加常用文本");
-                  textPage.addView(add);
+                  textSaveButton = button("添加常用文本");
+                  textPage.addView(textSaveButton);
+                  textCancelEditButton = button("取消编辑");
+                  textCancelEditButton.setVisibility(View.GONE);
+                  textPage.addView(textCancelEditButton);
                   savedTextList = new LinearLayout(this);
                   savedTextList.setOrientation(LinearLayout.VERTICAL);
                   textPage.addView(savedTextList);
-                  add.setOnClickListener(v -> addSavedText());
+                  textSaveButton.setOnClickListener(v -> addSavedText());
+                  textCancelEditButton.setOnClickListener(v -> cancelTextEdit());
               }
           
               private void buildLinkPage() {
@@ -387,12 +393,16 @@ jobs:
                   linkUrlInput.setSingleLine(true);
                   linkPage.addView(labelWrap("标题", linkTitleInput));
                   linkPage.addView(labelWrap("网址", linkUrlInput));
-                  Button add = button("添加快捷链接");
-                  linkPage.addView(add);
+                  linkSaveButton = button("添加快捷链接");
+                  linkPage.addView(linkSaveButton);
+                  linkCancelEditButton = button("取消编辑");
+                  linkCancelEditButton.setVisibility(View.GONE);
+                  linkPage.addView(linkCancelEditButton);
                   linkList = new LinearLayout(this);
                   linkList.setOrientation(LinearLayout.VERTICAL);
                   linkPage.addView(linkList);
-                  add.setOnClickListener(v -> addLink());
+                  linkSaveButton.setOnClickListener(v -> addLink());
+                  linkCancelEditButton.setOnClickListener(v -> cancelLinkEdit());
               }
           
               private void buildTimerPage() {
@@ -741,14 +751,20 @@ jobs:
                       JSONObject obj = new JSONObject();
                       obj.put("title", title);
                       obj.put("content", content);
-                      array.put(obj);
+                      if (editingTextIndex >= 0 && editingTextIndex < array.length()) {
+                          array.put(editingTextIndex, obj);
+                      } else {
+                          array.put(obj);
+                      }
                       saveArray("texts", array);
                   } catch (Exception ignored) {}
+                  boolean edited = editingTextIndex >= 0;
                   titleInput.setText("");
                   contentInput.setText("");
+                  cancelTextEditStateOnly();
                   renderSavedTexts();
                   hideKeyboard();
-                  statusText.setText("已添加常用文本");
+                  statusText.setText(edited ? "已保存常用文本修改" : "已添加常用文本");
               }
           
               private void renderSavedTexts() {
@@ -771,17 +787,44 @@ jobs:
                   card.addView(text(preview(content), 14, Color.LTGRAY));
                   LinearLayout actions = row();
                   Button copy = button("复制");
+                  Button edit = button("编辑");
                   Button delete = button("删除");
                   copy.setOnClickListener(v -> copyText(title, content));
+                  edit.setOnClickListener(v -> startTextEdit(index, title, content));
                   delete.setOnClickListener(v -> {
+                      if (editingTextIndex == index) cancelTextEditStateOnly();
                       removeItem("texts", index);
                       renderSavedTexts();
                       statusText.setText("已删除常用文本");
                   });
                   actions.addView(copy, weight());
+                  actions.addView(edit, weight());
                   actions.addView(delete, weight());
                   card.addView(actions);
                   return card;
+              }
+          
+              private void startTextEdit(int index, String title, String content) {
+                  editingTextIndex = index;
+                  titleInput.setText(title);
+                  contentInput.setText(content);
+                  textSaveButton.setText("保存修改");
+                  textCancelEditButton.setVisibility(View.VISIBLE);
+                  statusText.setText("正在编辑常用文本");
+                  showPage("text");
+              }
+          
+              private void cancelTextEdit() {
+                  titleInput.setText("");
+                  contentInput.setText("");
+                  cancelTextEditStateOnly();
+                  statusText.setText("已取消编辑");
+              }
+          
+              private void cancelTextEditStateOnly() {
+                  editingTextIndex = -1;
+                  if (textSaveButton != null) textSaveButton.setText("添加常用文本");
+                  if (textCancelEditButton != null) textCancelEditButton.setVisibility(View.GONE);
               }
           
               private void addLink() {
@@ -797,14 +840,20 @@ jobs:
                       JSONObject obj = new JSONObject();
                       obj.put("title", title);
                       obj.put("url", url);
-                      array.put(obj);
+                      if (editingLinkIndex >= 0 && editingLinkIndex < array.length()) {
+                          array.put(editingLinkIndex, obj);
+                      } else {
+                          array.put(obj);
+                      }
                       saveArray("links", array);
                   } catch (Exception ignored) {}
+                  boolean edited = editingLinkIndex >= 0;
                   linkTitleInput.setText("");
                   linkUrlInput.setText("");
+                  cancelLinkEditStateOnly();
                   renderLinks();
                   hideKeyboard();
-                  statusText.setText("已添加快捷链接");
+                  statusText.setText(edited ? "已保存快捷链接修改" : "已添加快捷链接");
               }
           
               private void renderLinks() {
@@ -828,19 +877,46 @@ jobs:
                   LinearLayout actions = row();
                   Button open = button("打开");
                   Button copy = button("复制网址");
+                  Button edit = button("编辑");
                   Button delete = button("删除");
                   open.setOnClickListener(v -> openUrl(url));
                   copy.setOnClickListener(v -> copyText(title + "网址", url));
+                  edit.setOnClickListener(v -> startLinkEdit(index, title, url));
                   delete.setOnClickListener(v -> {
+                      if (editingLinkIndex == index) cancelLinkEditStateOnly();
                       removeItem("links", index);
                       renderLinks();
                       statusText.setText("已删除快捷链接");
                   });
                   actions.addView(open, weight());
                   actions.addView(copy, weight());
+                  actions.addView(edit, weight());
                   actions.addView(delete, weight());
                   card.addView(actions);
                   return card;
+              }
+          
+              private void startLinkEdit(int index, String title, String url) {
+                  editingLinkIndex = index;
+                  linkTitleInput.setText(title);
+                  linkUrlInput.setText(url);
+                  linkSaveButton.setText("保存修改");
+                  linkCancelEditButton.setVisibility(View.VISIBLE);
+                  statusText.setText("正在编辑快捷链接");
+                  showPage("link");
+              }
+          
+              private void cancelLinkEdit() {
+                  linkTitleInput.setText("");
+                  linkUrlInput.setText("");
+                  cancelLinkEditStateOnly();
+                  statusText.setText("已取消编辑");
+              }
+          
+              private void cancelLinkEditStateOnly() {
+                  editingLinkIndex = -1;
+                  if (linkSaveButton != null) linkSaveButton.setText("添加快捷链接");
+                  if (linkCancelEditButton != null) linkCancelEditButton.setVisibility(View.GONE);
               }
           
               private Button quickTimerButton(String label, int minutes) {
