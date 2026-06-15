@@ -70,8 +70,8 @@ jobs:
                   applicationId "com.trae.phonehelper"
                   minSdk 26
                   targetSdk 35
-                  versionCode 17
-                  versionName "1.6.4"
+                  versionCode 18
+                  versionName "1.7"
               }
           }
           EOF_app_build_gradle
@@ -220,6 +220,7 @@ jobs:
                   getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
                   pref = getSharedPreferences(PREF, MODE_PRIVATE);
                   ensureDefaults();
+                  refreshDefaultContentFor17();
                   restoreTimerState();
                   restorePomoState();
                   loadAiMessages();
@@ -516,6 +517,27 @@ jobs:
                   aiInput.setMaxLines(5);
                   aiPage.addView(aiInput);
           
+                  aiPage.addView(sectionTitle("快捷提示词"));
+                  aiPage.addView(infoCard("点一下会填入输入框，不会自动发送。你可以继续补充内容后再发送。"));
+                  LinearLayout promptRow1 = row();
+                  Button explain = button("解释内容");
+                  Button fix = button("检查错误");
+                  promptRow1.addView(explain, weight());
+                  promptRow1.addView(fix, weight());
+                  aiPage.addView(promptRow1);
+                  LinearLayout promptRow2 = row();
+                  Button plan = button("学习计划");
+                  Button notes = button("整理笔记");
+                  promptRow2.addView(plan, weight());
+                  promptRow2.addView(notes, weight());
+                  aiPage.addView(promptRow2);
+                  LinearLayout promptRow3 = row();
+                  Button translate = button("翻译中文");
+                  Button polish = button("润色文字");
+                  promptRow3.addView(translate, weight());
+                  promptRow3.addView(polish, weight());
+                  aiPage.addView(promptRow3);
+          
                   LinearLayout actions = row();
                   aiSendButton = button("发送");
                   Button clear = button("清空");
@@ -523,6 +545,12 @@ jobs:
                   actions.addView(clear, weight());
                   aiPage.addView(actions);
           
+                  explain.setOnClickListener(v -> fillAiPrompt("请用通俗易懂的中文解释下面这段内容，先总结重点，再分点说明："));
+                  fix.setOnClickListener(v -> fillAiPrompt("请帮我检查下面的问题或报错，说明可能原因，并给出一步步解决方法："));
+                  plan.setOnClickListener(v -> fillAiPrompt("请根据下面的目标，帮我制定一个简单、可执行的学习计划："));
+                  notes.setOnClickListener(v -> fillAiPrompt("请把下面内容整理成清晰的笔记，保留重点、步骤和注意事项："));
+                  translate.setOnClickListener(v -> fillAiPrompt("请把下面内容翻译成自然、准确的中文："));
+                  polish.setOnClickListener(v -> fillAiPrompt("请帮我润色下面这段文字，让它更清楚、自然、礼貌，但不要改变原意："));
                   aiSendButton.setOnClickListener(v -> sendAiMessage());
                   clear.setOnClickListener(v -> {
                       aiMessages = new JSONArray();
@@ -531,6 +559,19 @@ jobs:
                       showStatus("AI 对话已清空");
                   });
                   renderAiMessages();
+              }
+          
+              private void fillAiPrompt(String prompt) {
+                  String current = aiInput.getText().toString().trim();
+                  if (current.isEmpty()) {
+                      aiInput.setText(prompt + "\n");
+                  } else {
+                      aiInput.setText(prompt + "\n\n" + current);
+                  }
+                  aiInput.setSelection(aiInput.getText().length());
+                  aiInput.requestFocus();
+                  showStatus("已填入快捷提示词");
+                  scrollFocusedInputIntoView(aiInput);
               }
           
               private void buildAiSettingsPage() {
@@ -1400,13 +1441,13 @@ jobs:
                       addDefaultText(texts, "GitHub Actions 文件名", ".github/workflows/build-apk.yml");
                       addDefaultText(texts, "OpenRouter API 地址", "https://openrouter.ai/api/v1/chat/completions");
                       addDefaultText(texts, "OpenRouter 免费模型", "openrouter/free");
-                      addDefaultText(texts, "提交信息：添加 APK 打包流程", "添加安卓APK打包流程");
-                      addDefaultText(texts, "提交信息：升级版本", "升级版本");
                       JSONArray links = new JSONArray();
                       addDefaultLink(links, "GitHub", "https://github.com");
                       addDefaultLink(links, "OpenRouter", "https://openrouter.ai");
                       addDefaultLink(links, "OpenRouter Keys", "https://openrouter.ai/settings/keys");
                       addDefaultLink(links, "DeepSeek API", "https://platform.deepseek.com");
+                      addDefaultLink(links, "Netlify", "https://www.netlify.com");
+                      addDefaultLink(links, "WebIntoApp 网页封装", "https://www.webintoapp.com");
                       pref.edit()
                               .putString("texts", texts.toString())
                               .putString("links", links.toString())
@@ -1415,6 +1456,41 @@ jobs:
                               .putInt("pomoRestMin", 5)
                               .apply();
                   }
+              }
+          
+              private void refreshDefaultContentFor17() {
+                  if (pref.getBoolean("defaultsV17Ready", false)) return;
+                  JSONArray oldTexts = loadArray("texts");
+                  JSONArray newTexts = new JSONArray();
+                  for (int i = 0; i < oldTexts.length(); i++) {
+                      try {
+                          JSONObject obj = oldTexts.getJSONObject(i);
+                          String title = obj.optString("title", "");
+                          String content = obj.optString("content", "");
+                          if (title.contains("添加 APK 打包流程") || title.contains("升级版本")) continue;
+                          if ("添加安卓APK打包流程".equals(content) || "升级版本".equals(content)) continue;
+                          newTexts.put(obj);
+                      } catch (Exception ignored) {}
+                  }
+                  saveArray("texts", newTexts);
+          
+                  JSONArray links = loadArray("links");
+                  addLinkIfMissing(links, "Netlify", "https://www.netlify.com");
+                  addLinkIfMissing(links, "WebIntoApp 网页封装", "https://www.webintoapp.com");
+                  saveArray("links", links);
+                  pref.edit().putBoolean("defaultsV17Ready", true).apply();
+              }
+          
+              private void addLinkIfMissing(JSONArray array, String title, String url) {
+                  for (int i = 0; i < array.length(); i++) {
+                      try {
+                          JSONObject obj = array.getJSONObject(i);
+                          if (url.equalsIgnoreCase(obj.optString("url", "")) || title.equals(obj.optString("title", ""))) {
+                              return;
+                          }
+                      } catch (Exception ignored) {}
+                  }
+                  addDefaultLink(array, title, url);
               }
           
               private void addDefaultText(JSONArray array, String title, String content) {
