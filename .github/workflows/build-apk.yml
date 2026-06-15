@@ -70,8 +70,8 @@ jobs:
                   applicationId "com.trae.phonehelper"
                   minSdk 26
                   targetSdk 35
-                  versionCode 22
-                  versionName "1.7.4"
+                  versionCode 24
+                  versionName "1.8"
               }
           }
           TRAE_FILE_app_build_gradle
@@ -204,6 +204,7 @@ jobs:
               private int rootBaseBottomPadding = 28;
               private int aiBaseBottomPadding = 20;
               private String currentPage = "home";
+              private int streamingAssistantIndex = -1;
               private int editingTextIndex = -1;
               private int editingLinkIndex = -1;
               private long lastBackPressedAt = 0;
@@ -817,6 +818,9 @@ jobs:
                   Button copy = button("复制");
                   Button edit = button("编辑");
                   Button delete = button("删除");
+                  LinearLayout sortActions = row();
+                  Button up = button("上移");
+                  Button down = button("下移");
                   copy.setOnClickListener(v -> copyText(title, content));
                   edit.setOnClickListener(v -> startTextEdit(index, title, content));
                   delete.setOnClickListener(v -> {
@@ -825,10 +829,19 @@ jobs:
                       renderSavedTexts();
                       showStatus("已删除常用文本");
                   });
+                  up.setEnabled(index > 0);
+                  down.setEnabled(index < loadArray("texts").length() - 1);
+                  up.setAlpha(index > 0 ? 1f : 0.45f);
+                  down.setAlpha(index < loadArray("texts").length() - 1 ? 1f : 0.45f);
+                  up.setOnClickListener(v -> moveItem("texts", index, index - 1, "text"));
+                  down.setOnClickListener(v -> moveItem("texts", index, index + 1, "text"));
                   actions.addView(copy, weight());
                   actions.addView(edit, weight());
                   actions.addView(delete, weight());
                   card.addView(actions);
+                  sortActions.addView(up, weight());
+                  sortActions.addView(down, weight());
+                  card.addView(sortActions);
                   return card;
               }
           
@@ -907,6 +920,9 @@ jobs:
                   Button copy = button("复制网址");
                   Button edit = button("编辑");
                   Button delete = button("删除");
+                  LinearLayout sortActions = row();
+                  Button up = button("上移");
+                  Button down = button("下移");
                   open.setOnClickListener(v -> openUrl(url));
                   copy.setOnClickListener(v -> copyText(title + "网址", url));
                   edit.setOnClickListener(v -> startLinkEdit(index, title, url));
@@ -916,11 +932,20 @@ jobs:
                       renderLinks();
                       showStatus("已删除快捷链接");
                   });
+                  up.setEnabled(index > 0);
+                  down.setEnabled(index < loadArray("links").length() - 1);
+                  up.setAlpha(index > 0 ? 1f : 0.45f);
+                  down.setAlpha(index < loadArray("links").length() - 1 ? 1f : 0.45f);
+                  up.setOnClickListener(v -> moveItem("links", index, index - 1, "link"));
+                  down.setOnClickListener(v -> moveItem("links", index, index + 1, "link"));
                   actions.addView(open, weight());
                   actions.addView(copy, weight());
                   actions.addView(edit, weight());
                   actions.addView(delete, weight());
                   card.addView(actions);
+                  sortActions.addView(up, weight());
+                  sortActions.addView(down, weight());
+                  card.addView(sortActions);
                   return card;
               }
           
@@ -1244,20 +1269,45 @@ jobs:
                   aiSending = true;
                   updateAiSendingUi();
                   showStatus(testMode ? "正在测试 AI 连接..." : "AI 正在思考...");
+                  final String requestBody;
+                  try {
+                      requestBody = buildAiRequestBody();
+                      streamingAssistantIndex = appendAiMessage("assistant", "正在思考...");
+                  } catch (Exception e) {
+                      showStatus("AI 设置有问题：" + shortError(e.getMessage()));
+                      aiSending = false;
+                      updateAiSendingUi();
+                      return;
+                  }
                   new Thread(() -> {
                       try {
-                          String reply = requestAiCompletion();
+                          String reply = requestAiCompletionStream(requestBody, delta -> runOnUiThread(() -> {
+                              if (streamingAssistantIndex >= 0) {
+                                  updateAiMessage(streamingAssistantIndex, "assistant", delta);
+                              }
+                          }));
                           runOnUiThread(() -> {
-                              appendAiMessage("assistant", reply);
+                              if (streamingAssistantIndex >= 0) {
+                                  updateAiMessage(streamingAssistantIndex, "assistant", reply);
+                              } else {
+                                  appendAiMessage("assistant", reply);
+                              }
                               showStatus("AI 回复完成");
                               aiSending = false;
+                              streamingAssistantIndex = -1;
                               updateAiSendingUi();
                           });
                       } catch (Exception e) {
                           runOnUiThread(() -> {
-                              appendAiMessage("assistant", "请求失败：" + shortError(e.getMessage()));
+                              String fail = "请求失败：" + shortError(e.getMessage());
+                              if (streamingAssistantIndex >= 0) {
+                                  updateAiMessage(streamingAssistantIndex, "assistant", fail);
+                              } else {
+                                  appendAiMessage("assistant", fail);
+                              }
                               showStatus("AI 请求失败，请检查 API 设置");
                               aiSending = false;
+                              streamingAssistantIndex = -1;
                               updateAiSendingUi();
                           });
                       }
@@ -1271,7 +1321,7 @@ jobs:
                   aiSendButton.setAlpha(aiSending ? 0.55f : 1f);
               }
           
-              private String requestAiCompletion() throws Exception {
+              private String buildAiRequestBody() throws Exception {
                   String apiUrl = pref.getString("aiApiUrl", "").trim();
                   String apiKey = pref.getString("aiApiKey", "").trim();
                   String model = pref.getString("aiModel", "openrouter/free").trim();
@@ -1295,26 +1345,73 @@ jobs:
                   }
                   body.put("messages", apiMessages);
                   body.put("temperature", 0.7);
+                  body.put("stream", true);
+                  return body.toString();
+              }
+          
+              private String requestAiCompletionStream(String requestBody, AiStreamCallback callback) throws Exception {
+                  String apiUrl = pref.getString("aiApiUrl", "").trim();
+                  String apiKey = pref.getString("aiApiKey", "").trim();
           
                   HttpURLConnection conn = (HttpURLConnection) new URL(apiUrl).openConnection();
                   conn.setRequestMethod("POST");
                   conn.setConnectTimeout(30000);
-                  conn.setReadTimeout(60000);
+                  conn.setReadTimeout(120000);
                   conn.setDoOutput(true);
                   conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+                  conn.setRequestProperty("Accept", "text/event-stream");
                   conn.setRequestProperty("Authorization", "Bearer " + apiKey);
           
                   try (OutputStream os = conn.getOutputStream()) {
-                      os.write(body.toString().getBytes(StandardCharsets.UTF_8));
+                      os.write(requestBody.getBytes(StandardCharsets.UTF_8));
                   }
           
                   int code = conn.getResponseCode();
                   InputStream stream = code >= 200 && code < 300 ? conn.getInputStream() : conn.getErrorStream();
-                  String response = readAll(stream);
                   if (code < 200 || code >= 300) {
+                      String response = readAll(stream);
                       throw new Exception("HTTP " + code + "：" + response);
                   }
           
+                  StringBuilder full = new StringBuilder();
+                  StringBuilder raw = new StringBuilder();
+                  BufferedReader br = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8));
+                  String line;
+                  while ((line = br.readLine()) != null) {
+                      line = line.trim();
+                      if (line.isEmpty()) continue;
+                      if (!line.startsWith("data:")) {
+                          raw.append(line);
+                          continue;
+                      }
+                      String data = line.substring(5).trim();
+                      if ("[DONE]".equals(data)) break;
+                      try {
+                          JSONObject json = new JSONObject(data);
+                          JSONArray choices = json.optJSONArray("choices");
+                          if (choices == null || choices.length() == 0) continue;
+                          JSONObject choice = choices.getJSONObject(0);
+                          JSONObject delta = choice.optJSONObject("delta");
+                          String piece = delta != null ? delta.optString("content", "") : "";
+                          if (!piece.isEmpty()) {
+                              full.append(piece);
+                              callback.onDelta(full.toString());
+                          }
+                      } catch (Exception ignored) {}
+                  }
+                  String result = full.toString().trim();
+                  if (!result.isEmpty()) return result;
+                  String normal = raw.toString().trim();
+                  if (normal.startsWith("{")) return parseNormalAiResponse(normal);
+          
+                  throw new Exception("没有收到 AI 回复内容");
+              }
+          
+              private interface AiStreamCallback {
+                  void onDelta(String fullText);
+              }
+          
+              private String parseNormalAiResponse(String response) throws Exception {
                   JSONObject json = new JSONObject(response);
                   JSONArray choices = json.getJSONArray("choices");
                   JSONObject message = choices.getJSONObject(0).getJSONObject("message");
@@ -1334,12 +1431,26 @@ jobs:
                   return sb.toString();
               }
           
-              private void appendAiMessage(String role, String content) {
+              private int appendAiMessage(String role, String content) {
                   try {
                       JSONObject obj = new JSONObject();
                       obj.put("role", role);
                       obj.put("content", content);
                       aiMessages.put(obj);
+                      saveAiMessages();
+                      renderAiMessages();
+                      return aiMessages.length() - 1;
+                  } catch (Exception ignored) {}
+                  return -1;
+              }
+          
+              private void updateAiMessage(int index, String role, String content) {
+                  try {
+                      if (index < 0 || index >= aiMessages.length()) return;
+                      JSONObject obj = new JSONObject();
+                      obj.put("role", role);
+                      obj.put("content", content);
+                      aiMessages.put(index, obj);
                       saveAiMessages();
                       renderAiMessages();
                   } catch (Exception ignored) {}
@@ -1567,6 +1678,37 @@ jobs:
                       } catch (Exception ignored) {}
                   }
                   saveArray(key, result);
+              }
+          
+              private void moveItem(String key, int from, int to, String type) {
+                  if ("text".equals(type) && editingTextIndex >= 0) {
+                      showStatus("请先保存或取消编辑");
+                      return;
+                  }
+                  if ("link".equals(type) && editingLinkIndex >= 0) {
+                      showStatus("请先保存或取消编辑");
+                      return;
+                  }
+                  JSONArray source = loadArray(key);
+                  if (from < 0 || to < 0 || from >= source.length() || to >= source.length()) return;
+                  JSONArray result = new JSONArray();
+                  try {
+                      JSONObject moving = source.getJSONObject(from);
+                      for (int i = 0; i < source.length(); i++) {
+                          if (i == from) continue;
+                          if (i == to && from > to) result.put(moving);
+                          result.put(source.getJSONObject(i));
+                          if (i == to && from < to) result.put(moving);
+                      }
+                      saveArray(key, result);
+                      if ("text".equals(type)) {
+                          renderSavedTexts();
+                          showStatus("已调整常用文本顺序");
+                      } else {
+                          renderLinks();
+                          showStatus("已调整快捷链接顺序");
+                      }
+                  } catch (Exception ignored) {}
               }
           
               private String preview(String value) {
