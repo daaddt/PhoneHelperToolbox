@@ -2,321 +2,1843 @@ name: 构建手机助手工具箱 APK
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: 准备 JDK 17
+      - name: 获取仓库
+        uses: actions/checkout@v4
+
+      - name: 安装 Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: 准备 Android SDK
+      - name: 安装 Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: 写出源码包
+      - name: 生成安卓项目源码
+        shell: bash
         run: |
-          mkdir -p phone-helper
-          cat <<'PAYLOAD' | base64 -d > phone-helper/source.zip
-          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
-          PAYLOAD
-          unzip -q phone-helper/source.zip -d phone-helper
+          set -e
+          mkdir -p "$(dirname 'settings.gradle')"
+          cat > 'settings.gradle' <<'TRAE_FILE_settings_gradle'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          
+          rootProject.name = "PhoneHelperToolbox"
+          include ":app"
+          TRAE_FILE_settings_gradle
 
-      - name: 准备 Gradle Wrapper
-        working-directory: phone-helper
+          mkdir -p "$(dirname 'build.gradle')"
+          cat > 'build.gradle' <<'TRAE_FILE_build_gradle'
+          plugins {
+              id "com.android.application" version "8.5.2" apply false
+          }
+          TRAE_FILE_build_gradle
+
+          mkdir -p "$(dirname 'app/build.gradle')"
+          cat > 'app/build.gradle' <<'TRAE_FILE_app_build_gradle'
+          plugins {
+              id "com.android.application"
+          }
+          
+          android {
+              namespace "com.trae.phonehelper"
+              compileSdk 35
+          
+              defaultConfig {
+                  applicationId "com.trae.phonehelper"
+                  minSdk 26
+                  targetSdk 35
+                  versionCode 22
+                  versionName "1.7.4"
+              }
+          }
+          TRAE_FILE_app_build_gradle
+
+          mkdir -p "$(dirname 'app/src/main/AndroidManifest.xml')"
+          cat > 'app/src/main/AndroidManifest.xml' <<'TRAE_FILE_app_src_main_AndroidManifest_xml'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.VIBRATE" />
+          
+              <application
+                  android:allowBackup="true"
+                  android:theme="@style/AppTheme"
+                  android:label="手机助手工具箱"
+                  android:resizeableActivity="true"
+                  android:supportsRtl="true">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:windowSoftInputMode="adjustResize">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          TRAE_FILE_app_src_main_AndroidManifest_xml
+
+          mkdir -p "$(dirname 'app/src/main/res/values/styles.xml')"
+          cat > 'app/src/main/res/values/styles.xml' <<'TRAE_FILE_app_src_main_res_values_styles_xml'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">
+                  <item name="android:fontFamily">sans</item>
+                  <item name="android:windowLightStatusBar">false</item>
+                  <item name="android:statusBarColor">#07111F</item>
+                  <item name="android:navigationBarColor">#07111F</item>
+                  <item name="android:colorAccent">#38BDF8</item>
+              </style>
+          </resources>
+          TRAE_FILE_app_src_main_res_values_styles_xml
+
+          mkdir -p "$(dirname 'app/src/main/java/com/trae/phonehelper/MainActivity.java')"
+          cat > 'app/src/main/java/com/trae/phonehelper/MainActivity.java' <<'TRAE_FILE_app_src_main_java_com_trae_phonehelper_MainActivity_java'
+          package com.trae.phonehelper;
+          
+          import android.app.Activity;
+          import android.content.ClipData;
+          import android.content.ClipboardManager;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.SharedPreferences;
+          import android.graphics.Color;
+          import android.graphics.Rect;
+          import android.graphics.Typeface;
+          import android.graphics.drawable.GradientDrawable;
+          import android.net.Uri;
+          import android.os.Bundle;
+          import android.os.Handler;
+          import android.os.SystemClock;
+          import android.text.InputType;
+          import android.os.Vibrator;
+          import android.view.Gravity;
+          import android.view.View;
+          import android.view.WindowManager;
+          import android.view.inputmethod.InputMethodManager;
+          import android.widget.Button;
+          import android.widget.CheckBox;
+          import android.widget.EditText;
+          import android.widget.FrameLayout;
+          import android.widget.LinearLayout;
+          import android.widget.ScrollView;
+          import android.widget.TextView;
+          import android.widget.Toast;
+          
+          import org.json.JSONArray;
+          import org.json.JSONObject;
+          
+          import java.io.BufferedReader;
+          import java.io.InputStream;
+          import java.io.InputStreamReader;
+          import java.io.OutputStream;
+          import java.net.HttpURLConnection;
+          import java.net.URL;
+          import java.nio.charset.StandardCharsets;
+          import java.text.SimpleDateFormat;
+          import java.util.Date;
+          import java.util.Locale;
+          
+          public class MainActivity extends Activity {
+              private static final String PREF = "phone_helper_pref";
+              private static final int PICK_TEXT_FILE = 3001;
+              private static final int CREATE_BACKUP_FILE = 3002;
+              private static final int PICK_BACKUP_FILE = 3003;
+              private SharedPreferences pref;
+              private final Handler handler = new Handler();
+          
+              private LinearLayout homePage, splitPage, textPage, linkPage, timerPage, pomoPage, aiPage, aiSettingsPage, backupPage;
+              private LinearLayout splitResultList, savedTextList, linkList, aiMessageList, aiInputArea;
+              private FrameLayout rootFrame;
+              private ScrollView rootScroll;
+              private ScrollView aiMessageScroll;
+              private LinearLayout rootContainer;
+              private EditText longTextInput, splitSizeInput, titleInput, contentInput, linkTitleInput, linkUrlInput;
+              private EditText aiInput, apiUrlInput, apiKeyInput, modelInput, systemPromptInput;
+              private TextView statusText, timerDisplay, pomoDisplay, pomoStateText, pomoCountText;
+              private Button stopwatchTab, countdownTab, timerStartPause, aiSendButton, textSaveButton, linkSaveButton, textCancelEditButton, linkCancelEditButton;
+              private CheckBox pomoLoopCheck;
+              private EditText timerMinuteInput, timerSecondInput, pomoFocusInput, pomoRestInput;
+          
+              private String timerMode = "stopwatch";
+              private boolean stopwatchRunning = false;
+              private long stopwatchElapsed = 0;
+              private long stopwatchStartedAt = 0;
+              private boolean countdownRunning = false;
+              private long countdownDuration = 5 * 60 * 1000L;
+              private long countdownElapsed = 0;
+              private long countdownStartedAt = 0;
+          
+              private boolean pomoRunning = false;
+              private boolean pomoFocus = true;
+              private long pomoDuration = 25 * 60 * 1000L;
+              private long pomoElapsed = 0;
+              private long pomoStartedAt = 0;
+          
+              private JSONArray aiMessages = new JSONArray();
+              private boolean aiSending = false;
+              private int rootBaseBottomPadding = 28;
+              private int aiBaseBottomPadding = 20;
+              private String currentPage = "home";
+              private int editingTextIndex = -1;
+              private int editingLinkIndex = -1;
+              private long lastBackPressedAt = 0;
+              private final Runnable hideStatusRunnable = this::hideStatus;
+          
+              private final Runnable tick = new Runnable() {
+                  @Override
+                  public void run() {
+                      updateTimerDisplay();
+                      updatePomoDisplay();
+                      handler.postDelayed(this, 250);
+                  }
+              };
+          
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+                  pref = getSharedPreferences(PREF, MODE_PRIVATE);
+                  ensureDefaults();
+                  refreshDefaultContentFor17();
+                  refreshDefaultContentFor171();
+                  restoreTimerState();
+                  restorePomoState();
+                  loadAiMessages();
+                  buildUi();
+                  renderSavedTexts();
+                  renderLinks();
+                  handler.post(tick);
+              }
+          
+              @Override
+              protected void onPause() {
+                  super.onPause();
+                  saveTimerState();
+                  savePomoState();
+              }
+          
+              @Override
+              protected void onDestroy() {
+                  super.onDestroy();
+                  saveTimerState();
+                  savePomoState();
+                  handler.removeCallbacks(tick);
+              }
+          
+              private void buildUi() {
+                  rootFrame = new FrameLayout(this);
+                  rootFrame.setBackgroundColor(Color.rgb(7, 17, 31));
+          
+                  rootScroll = new ScrollView(this);
+                  rootScroll.setFillViewport(false);
+                  rootScroll.setClipToPadding(false);
+                  rootScroll.setBackgroundColor(Color.rgb(7, 17, 31));
+                  rootContainer = new LinearLayout(this);
+                  rootContainer.setOrientation(LinearLayout.VERTICAL);
+                  rootContainer.setPadding(24, 120, 24, rootBaseBottomPadding);
+                  rootScroll.addView(rootContainer);
+          
+                  statusText = text("", 14, Color.rgb(52, 211, 153));
+                  statusText.setVisibility(View.GONE);
+                  rootContainer.addView(statusText);
+          
+                  homePage = page();
+                  splitPage = page();
+                  textPage = page();
+                  linkPage = page();
+                  timerPage = page();
+                  pomoPage = page();
+                  aiPage = page();
+                  aiSettingsPage = page();
+                  backupPage = page();
+                  rootContainer.addView(homePage);
+                  rootContainer.addView(splitPage);
+                  rootContainer.addView(textPage);
+                  rootContainer.addView(linkPage);
+                  rootContainer.addView(timerPage);
+                  rootContainer.addView(pomoPage);
+                  rootContainer.addView(aiSettingsPage);
+                  rootContainer.addView(backupPage);
+          
+                  buildHomePage();
+                  buildSplitPage();
+                  buildTextPage();
+                  buildLinkPage();
+                  buildTimerPage();
+                  buildPomoPage();
+                  buildAiPage();
+                  buildAiSettingsPage();
+                  buildBackupPage();
+          
+                  rootFrame.addView(rootScroll, new FrameLayout.LayoutParams(
+                          FrameLayout.LayoutParams.MATCH_PARENT,
+                          FrameLayout.LayoutParams.MATCH_PARENT
+                  ));
+                  rootFrame.addView(aiPage, new FrameLayout.LayoutParams(
+                          FrameLayout.LayoutParams.MATCH_PARENT,
+                          FrameLayout.LayoutParams.MATCH_PARENT
+                  ));
+          
+                  setContentView(rootFrame);
+                  installKeyboardGuard();
+                  showPage("home");
+              }
+          
+              private void buildHomePage() {
+                  TextView homeTitle = text("手机助手工具箱", 30, Color.WHITE);
+                  homeTitle.setTypeface(Typeface.DEFAULT_BOLD);
+                  homeTitle.setGravity(Gravity.CENTER_HORIZONTAL);
+                  homePage.addView(homeTitle);
+                  TextView homeTip = text("选择一个工具", 14, Color.rgb(148, 163, 184));
+                  homeTip.setGravity(Gravity.CENTER_HORIZONTAL);
+                  homePage.addView(homeTip);
+                  homePage.addView(sectionTitle("常用工具"));
+                  homePage.addView(homeButton("分段复制", "把长代码、长提示词、工作流自动拆成多段复制", "split"));
+                  homePage.addView(homeButton("常用文本", "保存 API 地址、模型名、提交信息等常用内容", "text"));
+                  homePage.addView(homeButton("快捷打开", "一键打开 GitHub、OpenRouter 等常用网页", "link"));
+                  homePage.addView(homeButton("数据备份", "导出或导入常用文本和快捷链接", "backup"));
+                  homePage.addView(sectionTitle("学习工具"));
+                  homePage.addView(homeButton("计时器", "正计时、倒计时和快速倒计时", "timer"));
+                  homePage.addView(homeButton("番茄钟", "专注 25 分钟，休息 5 分钟，记录今日完成数", "pomo"));
+                  homePage.addView(sectionTitle("AI工具"));
+                  homePage.addView(homeButton("AI聊天", "接入 OpenAI 兼容接口，支持 openrouter/free", "ai"));
+                  homePage.addView(homeButton("AI设置", "填写 API 地址、API Key、模型名和智能体设定", "aiSettings"));
+              }
+          
+              private View homeButton(String title, String desc, String pageName) {
+                  LinearLayout card = card();
+                  TextView t = text(title, 18, Color.WHITE);
+                  t.setTypeface(Typeface.DEFAULT_BOLD);
+                  card.addView(t);
+                  card.addView(text(desc, 13, Color.rgb(148, 163, 184)));
+                  TextView hint = text("点按进入", 13, Color.rgb(52, 211, 153));
+                  hint.setGravity(Gravity.RIGHT);
+                  card.addView(hint);
+                  card.setClickable(true);
+                  card.setOnClickListener(v -> showPage(pageName));
+                  return card;
+              }
+          
+              private void buildSplitPage() {
+                  splitPage.addView(sectionTitle("长文本分段复制"));
+                  splitPage.addView(infoCard("把很长的代码、工作流、提示词粘到这里，App 会自动分段，每段都有复制按钮。"));
+                  longTextInput = inputBox("粘贴长文本");
+                  longTextInput.setMinLines(8);
+                  longTextInput.setGravity(Gravity.TOP);
+                  splitPage.addView(longTextInput);
+                  splitSizeInput = inputBox("每段最大字数，默认 3000");
+                  splitSizeInput.setText("3000");
+                  splitSizeInput.setSingleLine(true);
+                  splitPage.addView(labelWrap("分段长度", splitSizeInput));
+                  LinearLayout actions = row();
+                  Button importFile = button("从文件导入");
+                  Button generate = button("生成分段");
+                  Button clear = button("清空");
+                  actions.addView(importFile, weight());
+                  actions.addView(generate, weight());
+                  actions.addView(clear, weight());
+                  splitPage.addView(actions);
+                  splitResultList = new LinearLayout(this);
+                  splitResultList.setOrientation(LinearLayout.VERTICAL);
+                  splitPage.addView(splitResultList);
+                  importFile.setOnClickListener(v -> chooseTextFile());
+                  generate.setOnClickListener(v -> generateChunks());
+                  clear.setOnClickListener(v -> {
+                      longTextInput.setText("");
+                      splitResultList.removeAllViews();
+                      showStatus("已清空");
+                  });
+              }
+          
+              private void buildTextPage() {
+                  textPage.addView(sectionTitle("常用文本"));
+                  textPage.addView(infoCard("保存常用路径、API 地址、模型名、提交信息。以后点一下就能复制。"));
+                  titleInput = inputBox("标题，例如 OpenRouter API 地址");
+                  titleInput.setSingleLine(true);
+                  contentInput = inputBox("内容");
+                  contentInput.setMinLines(3);
+                  contentInput.setGravity(Gravity.TOP);
+                  textPage.addView(labelWrap("标题", titleInput));
+                  textPage.addView(labelWrap("内容", contentInput));
+                  textSaveButton = button("添加常用文本");
+                  textPage.addView(textSaveButton);
+                  textCancelEditButton = button("取消编辑");
+                  textCancelEditButton.setVisibility(View.GONE);
+                  textPage.addView(textCancelEditButton);
+                  savedTextList = new LinearLayout(this);
+                  savedTextList.setOrientation(LinearLayout.VERTICAL);
+                  textPage.addView(savedTextList);
+                  textSaveButton.setOnClickListener(v -> addSavedText());
+                  textCancelEditButton.setOnClickListener(v -> cancelTextEdit());
+              }
+          
+              private void buildLinkPage() {
+                  linkPage.addView(sectionTitle("快捷打开"));
+                  linkPage.addView(infoCard("保存常用网站，一键打开 GitHub、OpenRouter、Actions 等页面。"));
+                  linkTitleInput = inputBox("标题，例如 GitHub");
+                  linkTitleInput.setSingleLine(true);
+                  linkUrlInput = inputBox("网址，例如 https://github.com");
+                  linkUrlInput.setSingleLine(true);
+                  linkPage.addView(labelWrap("标题", linkTitleInput));
+                  linkPage.addView(labelWrap("网址", linkUrlInput));
+                  linkSaveButton = button("添加快捷链接");
+                  linkPage.addView(linkSaveButton);
+                  linkCancelEditButton = button("取消编辑");
+                  linkCancelEditButton.setVisibility(View.GONE);
+                  linkPage.addView(linkCancelEditButton);
+                  linkList = new LinearLayout(this);
+                  linkList.setOrientation(LinearLayout.VERTICAL);
+                  linkPage.addView(linkList);
+                  linkSaveButton.setOnClickListener(v -> addLink());
+                  linkCancelEditButton.setOnClickListener(v -> cancelLinkEdit());
+              }
+          
+              private void buildTimerPage() {
+                  timerPage.addView(sectionTitle("计时器"));
+                  timerPage.addView(infoCard("包含正计时、倒计时和快速倒计时。适合临时计时，不替代闹钟。"));
+                  LinearLayout modeRow = row();
+                  stopwatchTab = button("正计时");
+                  countdownTab = button("倒计时");
+                  modeRow.addView(stopwatchTab, weight());
+                  modeRow.addView(countdownTab, weight());
+                  timerPage.addView(modeRow);
+                  timerDisplay = text("00:00.0", 56, Color.WHITE);
+                  timerDisplay.setGravity(Gravity.CENTER);
+                  timerDisplay.setPadding(0, 28, 0, 20);
+                  timerPage.addView(timerDisplay);
+                  LinearLayout edit = row();
+                  timerMinuteInput = inputBox("分钟");
+                  timerMinuteInput.setText("5");
+                  timerMinuteInput.setSingleLine(true);
+                  timerSecondInput = inputBox("秒");
+                  timerSecondInput.setText("0");
+                  timerSecondInput.setSingleLine(true);
+                  edit.addView(labelWrap("分钟", timerMinuteInput), weight());
+                  edit.addView(labelWrap("秒", timerSecondInput), weight());
+                  timerPage.addView(edit);
+                  Button set = button("设定倒计时");
+                  timerPage.addView(set);
+                  LinearLayout controls = row();
+                  timerStartPause = button("开始");
+                  Button reset = button("重置");
+                  controls.addView(timerStartPause, weight());
+                  controls.addView(reset, weight());
+                  timerPage.addView(controls);
+                  LinearLayout quick1 = row();
+                  quick1.addView(quickTimerButton("1 分钟", 1), weight());
+                  quick1.addView(quickTimerButton("3 分钟", 3), weight());
+                  timerPage.addView(quick1);
+                  LinearLayout quick2 = row();
+                  quick2.addView(quickTimerButton("5 分钟", 5), weight());
+                  quick2.addView(quickTimerButton("10 分钟", 10), weight());
+                  timerPage.addView(quick2);
+                  stopwatchTab.setOnClickListener(v -> {
+                      timerMode = "stopwatch";
+                      updateTimerDisplay();
+                      saveTimerState();
+                  });
+                  countdownTab.setOnClickListener(v -> {
+                      timerMode = "countdown";
+                      updateTimerDisplay();
+                      saveTimerState();
+                  });
+                  set.setOnClickListener(v -> setCountdownFromInput());
+                  timerStartPause.setOnClickListener(v -> toggleTimer());
+                  reset.setOnClickListener(v -> resetTimer());
+              }
+          
+              private void buildPomoPage() {
+                  pomoPage.addView(sectionTitle("番茄钟"));
+                  pomoPage.addView(infoCard("默认专注 25 分钟、休息 5 分钟。适合学习节奏管理。"));
+                  pomoStateText = text("准备开始专注", 18, Color.rgb(125, 211, 252));
+                  pomoStateText.setGravity(Gravity.CENTER);
+                  pomoPage.addView(pomoStateText);
+                  pomoDisplay = text("25:00", 60, Color.WHITE);
+                  pomoDisplay.setGravity(Gravity.CENTER);
+                  pomoPage.addView(pomoDisplay);
+                  pomoCountText = text("今日完成 0 个番茄", 16, Color.rgb(52, 211, 153));
+                  pomoCountText.setGravity(Gravity.CENTER);
+                  pomoPage.addView(pomoCountText);
+                  pomoLoopCheck = new CheckBox(this);
+                  pomoLoopCheck.setText("休息结束后自动进入下一轮专注");
+                  pomoLoopCheck.setTextColor(Color.WHITE);
+                  pomoLoopCheck.setTextSize(16);
+                  pomoLoopCheck.setChecked(pref.getBoolean("pomoLoop", true));
+                  pomoPage.addView(pomoLoopCheck);
+                  LinearLayout edit = row();
+                  pomoFocusInput = inputBox("专注分钟");
+                  pomoFocusInput.setText("25");
+                  pomoFocusInput.setSingleLine(true);
+                  pomoRestInput = inputBox("休息分钟");
+                  pomoRestInput.setText("5");
+                  pomoRestInput.setSingleLine(true);
+                  edit.addView(labelWrap("专注", pomoFocusInput), weight());
+                  edit.addView(labelWrap("休息", pomoRestInput), weight());
+                  pomoPage.addView(edit);
+                  Button apply = button("应用番茄钟设置");
+                  pomoPage.addView(apply);
+                  LinearLayout controls = row();
+                  Button startPause = button("开始/暂停");
+                  Button reset = button("重置");
+                  Button done = button("完成一个");
+                  controls.addView(startPause, weight());
+                  controls.addView(reset, weight());
+                  controls.addView(done, weight());
+                  pomoPage.addView(controls);
+                  apply.setOnClickListener(v -> applyPomoSettings());
+                  startPause.setOnClickListener(v -> togglePomo());
+                  reset.setOnClickListener(v -> resetPomo());
+                  done.setOnClickListener(v -> finishOnePomo());
+                  pomoLoopCheck.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                      pref.edit().putBoolean("pomoLoop", isChecked).apply();
+                      showStatus(isChecked ? "休息结束后会自动进入下一轮专注" : "休息结束后会暂停，等待手动开始");
+                  });
+                  updatePomoDisplay();
+              }
+          
+              private void buildAiPage() {
+                  aiPage.setPadding(24, 120, 24, aiBaseBottomPadding);
+                  aiPage.setBackgroundColor(Color.rgb(7, 17, 31));
+                  aiPage.addView(sectionTitle("AI聊天"));
+                  aiPage.addView(infoCard("这里使用 OpenAI 兼容接口。首次使用请先进入 AI设置，填写 API Key。"));
+          
+                  aiMessageScroll = new ScrollView(this);
+                  aiMessageScroll.setFillViewport(false);
+                  aiMessageScroll.setClipToPadding(false);
+                  aiMessageList = new LinearLayout(this);
+                  aiMessageList.setOrientation(LinearLayout.VERTICAL);
+                  aiMessageScroll.addView(aiMessageList);
+                  aiPage.addView(aiMessageScroll, new LinearLayout.LayoutParams(
+                          LinearLayout.LayoutParams.MATCH_PARENT,
+                          0,
+                          1
+                  ));
+          
+                  aiInputArea = new LinearLayout(this);
+                  aiInputArea.setOrientation(LinearLayout.VERTICAL);
+                  aiInputArea.setPadding(0, 10, 0, 0);
+                  GradientDrawable inputBg = new GradientDrawable();
+                  inputBg.setColor(Color.rgb(7, 17, 31));
+                  inputBg.setStroke(1, Color.rgb(30, 41, 59));
+                  inputBg.setCornerRadius(20);
+                  aiInputArea.setBackground(inputBg);
+          
+                  aiInput = inputBox("输入你想问 AI 的内容");
+                  aiInput.setMinLines(2);
+                  aiInput.setMaxLines(5);
+                  aiInputArea.addView(aiInput);
+          
+                  LinearLayout actions = row();
+                  aiSendButton = button("发送");
+                  Button clear = button("清空");
+                  actions.addView(aiSendButton, weight());
+                  actions.addView(clear, weight());
+                  aiInputArea.addView(actions);
+                  aiPage.addView(aiInputArea);
+          
+                  aiSendButton.setOnClickListener(v -> sendAiMessage());
+                  clear.setOnClickListener(v -> {
+                      aiMessages = new JSONArray();
+                      saveAiMessages();
+                      renderAiMessages();
+                      showStatus("AI 对话已清空");
+                  });
+                  renderAiMessages();
+              }
+          
+              private void buildAiSettingsPage() {
+                  aiSettingsPage.addView(sectionTitle("AI设置"));
+                  aiSettingsPage.addView(infoCard("API Key 只保存在本机，不会写进 GitHub。推荐模型名保持 openrouter/free。"));
+          
+                  apiUrlInput = inputBox("API 地址");
+                  apiUrlInput.setText(pref.getString("aiApiUrl", "https://openrouter.ai/api/v1/chat/completions"));
+                  aiSettingsPage.addView(labelWrap("API 地址", apiUrlInput));
+          
+                  apiKeyInput = inputBox("API Key");
+                  apiKeyInput.setSingleLine(true);
+                  apiKeyInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+                  apiKeyInput.setText(pref.getString("aiApiKey", ""));
+                  aiSettingsPage.addView(labelWrap("API Key", apiKeyInput));
+          
+                  modelInput = inputBox("模型名");
+                  modelInput.setSingleLine(true);
+                  modelInput.setText(pref.getString("aiModel", "openrouter/free"));
+                  aiSettingsPage.addView(labelWrap("模型名", modelInput));
+          
+                  systemPromptInput = inputBox("智能体设定");
+                  systemPromptInput.setMinLines(4);
+                  systemPromptInput.setText(pref.getString("aiSystemPrompt", "你是一个耐心、有逻辑、说中文的智能助手。回答要清晰、实用、不过度啰嗦。"));
+                  aiSettingsPage.addView(labelWrap("智能体设定", systemPromptInput));
+          
+                  LinearLayout actions = row();
+                  Button save = button("保存设置");
+                  Button test = button("测试连接");
+                  Button defaults = button("默认配置");
+                  actions.addView(save, weight());
+                  actions.addView(test, weight());
+                  actions.addView(defaults, weight());
+                  aiSettingsPage.addView(actions);
+          
+                  save.setOnClickListener(v -> {
+                      saveAiSettings();
+                      showStatus("AI 设置已保存");
+                      showPage("ai");
+                  });
+                  test.setOnClickListener(v -> {
+                      saveAiSettings();
+                      testAiConnection();
+                  });
+                  defaults.setOnClickListener(v -> fillDefaultAiSettings());
+              }
+          
+              private void buildBackupPage() {
+                  backupPage.addView(sectionTitle("数据备份"));
+                  backupPage.addView(infoCard("导出和导入常用文本、快捷链接。不会导出 AI Key，避免密钥泄露。"));
+                  LinearLayout actions = row();
+                  Button export = button("导出备份");
+                  Button importBackup = button("导入备份");
+                  actions.addView(export, weight());
+                  actions.addView(importBackup, weight());
+                  backupPage.addView(actions);
+                  backupPage.addView(infoCard("导出的文件是 JSON 文本。换手机、重装 App 或误删内容时，可以用它恢复常用文本和快捷链接。"));
+                  export.setOnClickListener(v -> createBackupFile());
+                  importBackup.setOnClickListener(v -> chooseBackupFile());
+              }
+          
+              private void chooseTextFile() {
+                  Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                  intent.addCategory(Intent.CATEGORY_OPENABLE);
+                  intent.setType("*/*");
+                  String[] mimeTypes = new String[]{
+                          "text/*",
+                          "application/json",
+                          "application/xml",
+                          "application/x-yaml",
+                          "application/octet-stream"
+                  };
+                  intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
+                  startActivityForResult(intent, PICK_TEXT_FILE);
+              }
+          
+              private void createBackupFile() {
+                  Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                  intent.addCategory(Intent.CATEGORY_OPENABLE);
+                  intent.setType("application/json");
+                  intent.putExtra(Intent.EXTRA_TITLE, "phone-helper-backup.json");
+                  startActivityForResult(intent, CREATE_BACKUP_FILE);
+              }
+          
+              private void chooseBackupFile() {
+                  Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                  intent.addCategory(Intent.CATEGORY_OPENABLE);
+                  intent.setType("*/*");
+                  String[] mimeTypes = new String[]{"application/json", "text/*", "application/octet-stream"};
+                  intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
+                  startActivityForResult(intent, PICK_BACKUP_FILE);
+              }
+          
+              @Override
+              protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+                  super.onActivityResult(requestCode, resultCode, data);
+                  if (requestCode == PICK_TEXT_FILE && resultCode == RESULT_OK && data != null && data.getData() != null) {
+                      importTextFile(data.getData());
+                  } else if (requestCode == CREATE_BACKUP_FILE && resultCode == RESULT_OK && data != null && data.getData() != null) {
+                      exportBackup(data.getData());
+                  } else if (requestCode == PICK_BACKUP_FILE && resultCode == RESULT_OK && data != null && data.getData() != null) {
+                      importBackup(data.getData());
+                  }
+              }
+          
+              private void importTextFile(Uri uri) {
+                  try {
+                      getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                  } catch (Exception ignored) {
+                  }
+                  try (InputStream inputStream = getContentResolver().openInputStream(uri)) {
+                      if (inputStream == null) {
+                          toast("无法读取这个文件");
+                          return;
+                      }
+                      String content = readAll(inputStream);
+                      longTextInput.setText(content);
+                      splitResultList.removeAllViews();
+                      showStatus("已导入文件，共 " + content.length() + " 字");
+                      showPage("split");
+                  } catch (Exception e) {
+                      showStatus("导入失败：" + shortError(e.getMessage()));
+                  }
+              }
+          
+              private void exportBackup(Uri uri) {
+                  try (OutputStream outputStream = getContentResolver().openOutputStream(uri)) {
+                      if (outputStream == null) {
+                          toast("无法创建备份文件");
+                          return;
+                      }
+                      JSONObject backup = new JSONObject();
+                      backup.put("version", 1);
+                      backup.put("texts", loadArray("texts"));
+                      backup.put("links", loadArray("links"));
+                      outputStream.write(backup.toString(2).getBytes(StandardCharsets.UTF_8));
+                      showStatus("备份已导出");
+                  } catch (Exception e) {
+                      showStatus("导出失败：" + shortError(e.getMessage()));
+                  }
+              }
+          
+              private void importBackup(Uri uri) {
+                  try (InputStream inputStream = getContentResolver().openInputStream(uri)) {
+                      if (inputStream == null) {
+                          toast("无法读取备份文件");
+                          return;
+                      }
+                      JSONObject backup = new JSONObject(readAll(inputStream));
+                      JSONArray texts = backup.optJSONArray("texts");
+                      JSONArray links = backup.optJSONArray("links");
+                      if (texts == null && links == null) {
+                          toast("这不是有效的备份文件");
+                          return;
+                      }
+                      if (texts != null) saveArray("texts", texts);
+                      if (links != null) saveArray("links", links);
+                      renderSavedTexts();
+                      renderLinks();
+                      showStatus("备份已导入");
+                  } catch (Exception e) {
+                      showStatus("导入失败：" + shortError(e.getMessage()));
+                  }
+              }
+          
+              private void generateChunks() {
+                  String source = longTextInput.getText().toString();
+                  if (source.trim().isEmpty()) {
+                      toast("请先粘贴长文本");
+                      return;
+                  }
+                  int size = parseInt(splitSizeInput.getText().toString(), 3000);
+                  size = Math.max(500, Math.min(10000, size));
+                  splitSizeInput.setText(String.valueOf(size));
+                  splitResultList.removeAllViews();
+                  int count = 0;
+                  for (int start = 0; start < source.length(); start += size) {
+                      int end = Math.min(source.length(), start + size);
+                      String chunk = source.substring(start, end);
+                      count++;
+                      splitResultList.addView(chunkCard(count, chunk));
+                  }
+                  hideKeyboard();
+                  showStatus("已生成 " + count + " 段");
+              }
+          
+              private View chunkCard(int index, String chunk) {
+                  LinearLayout card = card();
+                  TextView title = text(String.format("第 %02d 段 · %d 字", index, chunk.length()), 18, Color.WHITE);
+                  title.setTypeface(Typeface.DEFAULT_BOLD);
+                  card.addView(title);
+                  card.addView(text(preview(chunk), 14, Color.LTGRAY));
+                  Button copy = button("复制第 " + String.format("%02d", index) + " 段");
+                  copy.setOnClickListener(v -> copyText("第 " + index + " 段", chunk));
+                  card.addView(copy);
+                  return card;
+              }
+          
+              private void addSavedText() {
+                  String title = titleInput.getText().toString().trim();
+                  String content = contentInput.getText().toString();
+                  if (title.isEmpty() || content.trim().isEmpty()) {
+                      toast("标题和内容都要填写");
+                      return;
+                  }
+                  JSONArray array = loadArray("texts");
+                  try {
+                      JSONObject obj = new JSONObject();
+                      obj.put("title", title);
+                      obj.put("content", content);
+                      if (editingTextIndex >= 0 && editingTextIndex < array.length()) {
+                          array.put(editingTextIndex, obj);
+                      } else {
+                          array.put(obj);
+                      }
+                      saveArray("texts", array);
+                  } catch (Exception ignored) {}
+                  boolean edited = editingTextIndex >= 0;
+                  titleInput.setText("");
+                  contentInput.setText("");
+                  cancelTextEditStateOnly();
+                  renderSavedTexts();
+                  hideKeyboard();
+                  showStatus(edited ? "已保存常用文本修改" : "已添加常用文本");
+              }
+          
+              private void renderSavedTexts() {
+                  if (savedTextList == null) return;
+                  savedTextList.removeAllViews();
+                  JSONArray array = loadArray("texts");
+                  for (int i = 0; i < array.length(); i++) {
+                      try {
+                          JSONObject obj = array.getJSONObject(i);
+                          savedTextList.addView(savedTextCard(i, obj.optString("title"), obj.optString("content")));
+                      } catch (Exception ignored) {}
+                  }
+              }
+          
+              private View savedTextCard(int index, String title, String content) {
+                  LinearLayout card = card();
+                  TextView titleView = text(title, 18, Color.WHITE);
+                  titleView.setTypeface(Typeface.DEFAULT_BOLD);
+                  card.addView(titleView);
+                  card.addView(text(preview(content), 14, Color.LTGRAY));
+                  LinearLayout actions = row();
+                  Button copy = button("复制");
+                  Button edit = button("编辑");
+                  Button delete = button("删除");
+                  copy.setOnClickListener(v -> copyText(title, content));
+                  edit.setOnClickListener(v -> startTextEdit(index, title, content));
+                  delete.setOnClickListener(v -> {
+                      if (editingTextIndex == index) cancelTextEditStateOnly();
+                      removeItem("texts", index);
+                      renderSavedTexts();
+                      showStatus("已删除常用文本");
+                  });
+                  actions.addView(copy, weight());
+                  actions.addView(edit, weight());
+                  actions.addView(delete, weight());
+                  card.addView(actions);
+                  return card;
+              }
+          
+              private void startTextEdit(int index, String title, String content) {
+                  editingTextIndex = index;
+                  titleInput.setText(title);
+                  contentInput.setText(content);
+                  textSaveButton.setText("保存修改");
+                  textCancelEditButton.setVisibility(View.VISIBLE);
+                  showStatus("正在编辑常用文本");
+                  showPage("text");
+              }
+          
+              private void cancelTextEdit() {
+                  titleInput.setText("");
+                  contentInput.setText("");
+                  cancelTextEditStateOnly();
+                  showStatus("已取消编辑");
+              }
+          
+              private void cancelTextEditStateOnly() {
+                  editingTextIndex = -1;
+                  if (textSaveButton != null) textSaveButton.setText("添加常用文本");
+                  if (textCancelEditButton != null) textCancelEditButton.setVisibility(View.GONE);
+              }
+          
+              private void addLink() {
+                  String title = linkTitleInput.getText().toString().trim();
+                  String url = linkUrlInput.getText().toString().trim();
+                  if (title.isEmpty() || url.isEmpty()) {
+                      toast("标题和网址都要填写");
+                      return;
+                  }
+                  if (!url.startsWith("http://") && !url.startsWith("https://")) url = "https://" + url;
+                  JSONArray array = loadArray("links");
+                  try {
+                      JSONObject obj = new JSONObject();
+                      obj.put("title", title);
+                      obj.put("url", url);
+                      if (editingLinkIndex >= 0 && editingLinkIndex < array.length()) {
+                          array.put(editingLinkIndex, obj);
+                      } else {
+                          array.put(obj);
+                      }
+                      saveArray("links", array);
+                  } catch (Exception ignored) {}
+                  boolean edited = editingLinkIndex >= 0;
+                  linkTitleInput.setText("");
+                  linkUrlInput.setText("");
+                  cancelLinkEditStateOnly();
+                  renderLinks();
+                  hideKeyboard();
+                  showStatus(edited ? "已保存快捷链接修改" : "已添加快捷链接");
+              }
+          
+              private void renderLinks() {
+                  if (linkList == null) return;
+                  linkList.removeAllViews();
+                  JSONArray array = loadArray("links");
+                  for (int i = 0; i < array.length(); i++) {
+                      try {
+                          JSONObject obj = array.getJSONObject(i);
+                          linkList.addView(linkCard(i, obj.optString("title"), obj.optString("url")));
+                      } catch (Exception ignored) {}
+                  }
+              }
+          
+              private View linkCard(int index, String title, String url) {
+                  LinearLayout card = card();
+                  TextView titleView = text(title, 18, Color.WHITE);
+                  titleView.setTypeface(Typeface.DEFAULT_BOLD);
+                  card.addView(titleView);
+                  card.addView(text(url, 13, Color.LTGRAY));
+                  LinearLayout actions = row();
+                  Button open = button("打开");
+                  Button copy = button("复制网址");
+                  Button edit = button("编辑");
+                  Button delete = button("删除");
+                  open.setOnClickListener(v -> openUrl(url));
+                  copy.setOnClickListener(v -> copyText(title + "网址", url));
+                  edit.setOnClickListener(v -> startLinkEdit(index, title, url));
+                  delete.setOnClickListener(v -> {
+                      if (editingLinkIndex == index) cancelLinkEditStateOnly();
+                      removeItem("links", index);
+                      renderLinks();
+                      showStatus("已删除快捷链接");
+                  });
+                  actions.addView(open, weight());
+                  actions.addView(copy, weight());
+                  actions.addView(edit, weight());
+                  actions.addView(delete, weight());
+                  card.addView(actions);
+                  return card;
+              }
+          
+              private void startLinkEdit(int index, String title, String url) {
+                  editingLinkIndex = index;
+                  linkTitleInput.setText(title);
+                  linkUrlInput.setText(url);
+                  linkSaveButton.setText("保存修改");
+                  linkCancelEditButton.setVisibility(View.VISIBLE);
+                  showStatus("正在编辑快捷链接");
+                  showPage("link");
+              }
+          
+              private void cancelLinkEdit() {
+                  linkTitleInput.setText("");
+                  linkUrlInput.setText("");
+                  cancelLinkEditStateOnly();
+                  showStatus("已取消编辑");
+              }
+          
+              private void cancelLinkEditStateOnly() {
+                  editingLinkIndex = -1;
+                  if (linkSaveButton != null) linkSaveButton.setText("添加快捷链接");
+                  if (linkCancelEditButton != null) linkCancelEditButton.setVisibility(View.GONE);
+              }
+          
+              private Button quickTimerButton(String label, int minutes) {
+                  Button b = button(label);
+                  b.setOnClickListener(v -> {
+                      timerMode = "countdown";
+                      countdownDuration = minutes * 60 * 1000L;
+                      countdownElapsed = 0;
+                      countdownRunning = false;
+                      updateTimerDisplay();
+                      saveTimerState();
+                  });
+                  return b;
+              }
+          
+              private void setCountdownFromInput() {
+                  int minutes = parseInt(timerMinuteInput.getText().toString(), 5);
+                  int seconds = Math.max(0, Math.min(59, parseInt(timerSecondInput.getText().toString(), 0)));
+                  countdownDuration = Math.max(1000L, (minutes * 60L + seconds) * 1000L);
+                  countdownElapsed = 0;
+                  countdownRunning = false;
+                  timerMode = "countdown";
+                  updateTimerDisplay();
+                  saveTimerState();
+              }
+          
+              private void toggleTimer() {
+                  if ("stopwatch".equals(timerMode)) {
+                      if (stopwatchRunning) {
+                          stopwatchElapsed = getStopwatchElapsed();
+                          stopwatchRunning = false;
+                      } else {
+                          stopwatchRunning = true;
+                          stopwatchStartedAt = SystemClock.elapsedRealtime();
+                      }
+                  } else {
+                      if (countdownRunning) {
+                          countdownElapsed = getCountdownElapsed();
+                          countdownRunning = false;
+                      } else {
+                          if (getCountdownRemaining() <= 0) countdownElapsed = 0;
+                          countdownRunning = true;
+                          countdownStartedAt = SystemClock.elapsedRealtime();
+                      }
+                  }
+                  updateTimerDisplay();
+                  saveTimerState();
+              }
+          
+              private void resetTimer() {
+                  if ("stopwatch".equals(timerMode)) {
+                      stopwatchRunning = false;
+                      stopwatchElapsed = 0;
+                  } else {
+                      countdownRunning = false;
+                      countdownElapsed = 0;
+                  }
+                  updateTimerDisplay();
+                  saveTimerState();
+              }
+          
+              private long getStopwatchElapsed() {
+                  return stopwatchRunning ? stopwatchElapsed + SystemClock.elapsedRealtime() - stopwatchStartedAt : stopwatchElapsed;
+              }
+          
+              private long getCountdownElapsed() {
+                  return countdownRunning ? Math.min(countdownDuration, countdownElapsed + SystemClock.elapsedRealtime() - countdownStartedAt) : countdownElapsed;
+              }
+          
+              private long getCountdownRemaining() {
+                  return Math.max(0, countdownDuration - getCountdownElapsed());
+              }
+          
+              private void updateTimerDisplay() {
+                  if (timerDisplay == null) return;
+                  if (countdownRunning && getCountdownRemaining() <= 0) {
+                      countdownRunning = false;
+                      countdownElapsed = countdownDuration;
+                      buzz();
+                      showStatus("倒计时结束");
+                  }
+                  boolean stopwatch = "stopwatch".equals(timerMode);
+                  stopwatchTab.setAlpha(stopwatch ? 1f : 0.55f);
+                  countdownTab.setAlpha(stopwatch ? 0.55f : 1f);
+                  if (stopwatch) {
+                      timerDisplay.setText(formatTenths(getStopwatchElapsed()));
+                      timerStartPause.setText(stopwatchRunning ? "暂停" : getStopwatchElapsed() > 0 ? "继续" : "开始");
+                  } else {
+                      timerDisplay.setText(formatTenths(getCountdownRemaining()));
+                      timerStartPause.setText(countdownRunning ? "暂停" : getCountdownElapsed() > 0 && getCountdownRemaining() > 0 ? "继续" : "开始");
+                  }
+              }
+          
+              private void applyPomoSettings() {
+                  int focusMin = Math.max(1, Math.min(180, parseInt(pomoFocusInput.getText().toString(), 25)));
+                  int restMin = Math.max(1, Math.min(60, parseInt(pomoRestInput.getText().toString(), 5)));
+                  pref.edit()
+                          .putInt("pomoFocusMin", focusMin)
+                          .putInt("pomoRestMin", restMin)
+                          .putBoolean("pomoLoop", pomoLoopCheck == null || pomoLoopCheck.isChecked())
+                          .apply();
+                  pomoFocus = true;
+                  pomoRunning = false;
+                  pomoDuration = focusMin * 60 * 1000L;
+                  pomoElapsed = 0;
+                  updatePomoDisplay();
+                  showStatus("番茄钟设置已应用");
+              }
+          
+              private void togglePomo() {
+                  if (pomoRunning) {
+                      pomoElapsed = getPomoElapsed();
+                      pomoRunning = false;
+                  } else {
+                      if (getPomoRemaining() <= 0) pomoElapsed = 0;
+                      pomoRunning = true;
+                      pomoStartedAt = SystemClock.elapsedRealtime();
+                  }
+                  updatePomoDisplay();
+                  savePomoState();
+              }
+          
+              private void resetPomo() {
+                  pomoRunning = false;
+                  pomoFocus = true;
+                  pomoDuration = pref.getInt("pomoFocusMin", 25) * 60 * 1000L;
+                  pomoElapsed = 0;
+                  updatePomoDisplay();
+                  savePomoState();
+              }
+          
+              private void finishOnePomo() {
+                  increasePomoCount();
+                  pomoFocus = false;
+                  pomoRunning = false;
+                  pomoDuration = pref.getInt("pomoRestMin", 5) * 60 * 1000L;
+                  pomoElapsed = 0;
+                  updatePomoDisplay();
+                  savePomoState();
+                  showStatus("已记录完成 1 个番茄");
+              }
+          
+              private long getPomoElapsed() {
+                  return pomoRunning ? Math.min(pomoDuration, pomoElapsed + SystemClock.elapsedRealtime() - pomoStartedAt) : pomoElapsed;
+              }
+          
+              private long getPomoRemaining() {
+                  return Math.max(0, pomoDuration - getPomoElapsed());
+              }
+          
+              private void updatePomoDisplay() {
+                  if (pomoDisplay == null) return;
+                  if (pomoRunning && getPomoRemaining() <= 0) {
+                      pomoElapsed = pomoDuration;
+                      buzz();
+                      if (pomoFocus) {
+                          increasePomoCount();
+                          pomoFocus = false;
+                          pomoDuration = pref.getInt("pomoRestMin", 5) * 60 * 1000L;
+                          pomoElapsed = 0;
+                          pomoRunning = true;
+                          pomoStartedAt = SystemClock.elapsedRealtime();
+                          showStatus("专注完成，开始休息吧");
+                      } else {
+                          boolean autoLoop = pref.getBoolean("pomoLoop", true);
+                          pomoFocus = true;
+                          pomoDuration = pref.getInt("pomoFocusMin", 25) * 60 * 1000L;
+                          pomoElapsed = 0;
+                          pomoRunning = autoLoop;
+                          if (autoLoop) pomoStartedAt = SystemClock.elapsedRealtime();
+                          showStatus(autoLoop ? "休息结束，已开始下一轮专注" : "休息结束，等待手动开始下一轮");
+                      }
+                      savePomoState();
+                  }
+                  pomoDisplay.setText(formatMinutes(getPomoRemaining()));
+                  pomoStateText.setText((pomoFocus ? "专注" : "休息") + (pomoRunning ? "中" : "已暂停/待开始"));
+                  pomoCountText.setText("今日完成 " + getTodayPomoCount() + " 个番茄");
+              }
+          
+              private void increasePomoCount() {
+                  String today = today();
+                  String savedDay = pref.getString("pomoDay", "");
+                  int count = today.equals(savedDay) ? pref.getInt("pomoCount", 0) : 0;
+                  pref.edit().putString("pomoDay", today).putInt("pomoCount", count + 1).apply();
+              }
+          
+              private int getTodayPomoCount() {
+                  String today = today();
+                  return today.equals(pref.getString("pomoDay", "")) ? pref.getInt("pomoCount", 0) : 0;
+              }
+          
+              private String today() {
+                  return new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+              }
+          
+              private void restoreTimerState() {
+                  timerMode = pref.getString("timerMode", "stopwatch");
+                  stopwatchElapsed = pref.getLong("stopwatchElapsed", 0);
+                  stopwatchRunning = pref.getBoolean("stopwatchRunning", false);
+                  countdownDuration = pref.getLong("countdownDuration", 5 * 60 * 1000L);
+                  countdownElapsed = pref.getLong("countdownElapsed", 0);
+                  countdownRunning = pref.getBoolean("countdownRunning", false);
+                  long savedAt = pref.getLong("timerSavedAt", SystemClock.elapsedRealtime());
+                  long delta = Math.max(0, SystemClock.elapsedRealtime() - savedAt);
+                  if (stopwatchRunning) {
+                      stopwatchElapsed += delta;
+                      stopwatchStartedAt = SystemClock.elapsedRealtime();
+                  }
+                  if (countdownRunning) {
+                      countdownElapsed = Math.min(countdownDuration, countdownElapsed + delta);
+                      if (countdownElapsed >= countdownDuration) countdownRunning = false;
+                      countdownStartedAt = SystemClock.elapsedRealtime();
+                  }
+              }
+          
+              private void saveTimerState() {
+                  pref.edit()
+                          .putString("timerMode", timerMode)
+                          .putLong("stopwatchElapsed", getStopwatchElapsed())
+                          .putBoolean("stopwatchRunning", stopwatchRunning)
+                          .putLong("countdownDuration", countdownDuration)
+                          .putLong("countdownElapsed", getCountdownElapsed())
+                          .putBoolean("countdownRunning", countdownRunning)
+                          .putLong("timerSavedAt", SystemClock.elapsedRealtime())
+                          .apply();
+              }
+          
+              private void restorePomoState() {
+                  int focusMin = pref.getInt("pomoFocusMin", 25);
+                  int restMin = pref.getInt("pomoRestMin", 5);
+                  pomoFocus = pref.getBoolean("pomoFocus", true);
+                  pomoDuration = pref.getLong("pomoDuration", (pomoFocus ? focusMin : restMin) * 60 * 1000L);
+                  pomoElapsed = pref.getLong("pomoElapsed", 0);
+                  pomoRunning = pref.getBoolean("pomoRunning", false);
+                  long savedAt = pref.getLong("pomoSavedAt", SystemClock.elapsedRealtime());
+                  long delta = Math.max(0, SystemClock.elapsedRealtime() - savedAt);
+                  if (pomoRunning) {
+                      pomoElapsed = Math.min(pomoDuration, pomoElapsed + delta);
+                      if (pomoElapsed >= pomoDuration) pomoRunning = false;
+                      pomoStartedAt = SystemClock.elapsedRealtime();
+                  }
+              }
+          
+              private void savePomoState() {
+                  pref.edit()
+                          .putBoolean("pomoFocus", pomoFocus)
+                          .putLong("pomoDuration", pomoDuration)
+                          .putLong("pomoElapsed", getPomoElapsed())
+                          .putBoolean("pomoRunning", pomoRunning)
+                          .putLong("pomoSavedAt", SystemClock.elapsedRealtime())
+                          .apply();
+              }
+          
+              private String formatTenths(long ms) {
+                  long tenths = Math.max(0, ms) / 100;
+                  long tenth = tenths % 10;
+                  long totalSeconds = tenths / 10;
+                  long seconds = totalSeconds % 60;
+                  long minutes = totalSeconds / 60;
+                  return String.format(Locale.getDefault(), "%02d:%02d.%d", minutes, seconds, tenth);
+              }
+          
+              private String formatMinutes(long ms) {
+                  long totalSeconds = Math.max(0, ms + 999) / 1000;
+                  long seconds = totalSeconds % 60;
+                  long minutes = totalSeconds / 60;
+                  return String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds);
+              }
+          
+          
+              private void sendAiMessage() {
+                  String value = aiInput.getText().toString().trim();
+                  if (value.isEmpty() || aiSending) return;
+                  if (pref.getString("aiApiKey", "").trim().isEmpty()) {
+                      showStatus("请先在 AI设置 里填写 API Key");
+                      showPage("aiSettings");
+                      return;
+                  }
+                  appendAiMessage("user", value);
+                  aiInput.setText("");
+                  hideKeyboard();
+                  callAi(false);
+              }
+          
+              private void testAiConnection() {
+                  if (pref.getString("aiApiKey", "").trim().isEmpty()) {
+                      showStatus("请先填写 API Key");
+                      showPage("aiSettings");
+                      return;
+                  }
+                  appendAiMessage("user", "请用一句话回复：连接测试成功。");
+                  showPage("ai");
+                  callAi(true);
+              }
+          
+              private void callAi(boolean testMode) {
+                  aiSending = true;
+                  updateAiSendingUi();
+                  showStatus(testMode ? "正在测试 AI 连接..." : "AI 正在思考...");
+                  new Thread(() -> {
+                      try {
+                          String reply = requestAiCompletion();
+                          runOnUiThread(() -> {
+                              appendAiMessage("assistant", reply);
+                              showStatus("AI 回复完成");
+                              aiSending = false;
+                              updateAiSendingUi();
+                          });
+                      } catch (Exception e) {
+                          runOnUiThread(() -> {
+                              appendAiMessage("assistant", "请求失败：" + shortError(e.getMessage()));
+                              showStatus("AI 请求失败，请检查 API 设置");
+                              aiSending = false;
+                              updateAiSendingUi();
+                          });
+                      }
+                  }).start();
+              }
+          
+              private void updateAiSendingUi() {
+                  if (aiSendButton == null) return;
+                  aiSendButton.setEnabled(!aiSending);
+                  aiSendButton.setText(aiSending ? "发送中..." : "发送");
+                  aiSendButton.setAlpha(aiSending ? 0.55f : 1f);
+              }
+          
+              private String requestAiCompletion() throws Exception {
+                  String apiUrl = pref.getString("aiApiUrl", "").trim();
+                  String apiKey = pref.getString("aiApiKey", "").trim();
+                  String model = pref.getString("aiModel", "openrouter/free").trim();
+                  String systemPrompt = pref.getString("aiSystemPrompt", "").trim();
+                  if (apiUrl.isEmpty()) throw new Exception("API 地址为空");
+                  if (apiKey.isEmpty()) throw new Exception("API Key 为空");
+                  if (model.isEmpty()) throw new Exception("模型名为空");
+          
+                  JSONObject body = new JSONObject();
+                  body.put("model", model);
+                  JSONArray apiMessages = new JSONArray();
+                  if (!systemPrompt.isEmpty()) {
+                      JSONObject sys = new JSONObject();
+                      sys.put("role", "system");
+                      sys.put("content", systemPrompt);
+                      apiMessages.put(sys);
+                  }
+                  int start = Math.max(0, aiMessages.length() - 16);
+                  for (int i = start; i < aiMessages.length(); i++) {
+                      apiMessages.put(aiMessages.getJSONObject(i));
+                  }
+                  body.put("messages", apiMessages);
+                  body.put("temperature", 0.7);
+          
+                  HttpURLConnection conn = (HttpURLConnection) new URL(apiUrl).openConnection();
+                  conn.setRequestMethod("POST");
+                  conn.setConnectTimeout(30000);
+                  conn.setReadTimeout(60000);
+                  conn.setDoOutput(true);
+                  conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+                  conn.setRequestProperty("Authorization", "Bearer " + apiKey);
+          
+                  try (OutputStream os = conn.getOutputStream()) {
+                      os.write(body.toString().getBytes(StandardCharsets.UTF_8));
+                  }
+          
+                  int code = conn.getResponseCode();
+                  InputStream stream = code >= 200 && code < 300 ? conn.getInputStream() : conn.getErrorStream();
+                  String response = readAll(stream);
+                  if (code < 200 || code >= 300) {
+                      throw new Exception("HTTP " + code + "：" + response);
+                  }
+          
+                  JSONObject json = new JSONObject(response);
+                  JSONArray choices = json.getJSONArray("choices");
+                  JSONObject message = choices.getJSONObject(0).getJSONObject("message");
+                  return message.optString("content", "").trim();
+              }
+          
+              private String readAll(InputStream stream) throws Exception {
+                  BufferedReader br = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8));
+                  StringBuilder sb = new StringBuilder();
+                  String line;
+                  boolean first = true;
+                  while ((line = br.readLine()) != null) {
+                      if (!first) sb.append('\n');
+                      sb.append(line);
+                      first = false;
+                  }
+                  return sb.toString();
+              }
+          
+              private void appendAiMessage(String role, String content) {
+                  try {
+                      JSONObject obj = new JSONObject();
+                      obj.put("role", role);
+                      obj.put("content", content);
+                      aiMessages.put(obj);
+                      saveAiMessages();
+                      renderAiMessages();
+                  } catch (Exception ignored) {}
+              }
+          
+              private void renderAiMessages() {
+                  if (aiMessageList == null) return;
+                  aiMessageList.removeAllViews();
+                  for (int i = 0; i < aiMessages.length(); i++) {
+                      try {
+                          JSONObject msg = aiMessages.getJSONObject(i);
+                          aiMessageList.addView(aiBubble(msg.optString("role"), msg.optString("content")));
+                      } catch (Exception ignored) {}
+                  }
+                  if (aiMessageScroll != null) {
+                      aiMessageScroll.post(() -> {
+                          aiMessageScroll.smoothScrollTo(0, aiMessageList.getBottom());
+                          reapplyAiKeyboardOffset();
+                      });
+                  }
+              }
+          
+              private void reapplyAiKeyboardOffset() {
+                  if (aiInputArea == null || rootContainer == null) return;
+                  if (!"ai".equals(currentPage)) return;
+                  rootContainer.post(() -> {
+                      Rect visible = new Rect();
+                      rootContainer.getWindowVisibleDisplayFrame(visible);
+                      int screenHeight = rootContainer.getRootView().getHeight();
+                      int keyboardHeight = screenHeight - visible.bottom;
+                      boolean keyboardOpen = keyboardHeight > screenHeight / 5;
+                      adjustAiInputForKeyboard(visible, keyboardOpen);
+                  });
+              }
+          
+              private View aiBubble(String role, String content) {
+                  boolean user = "user".equals(role);
+                  LinearLayout wrap = new LinearLayout(this);
+                  wrap.setOrientation(LinearLayout.VERTICAL);
+                  TextView tv = text((user ? "你：\n" : "助手：\n") + content, 15, Color.WHITE);
+                  GradientDrawable bg = new GradientDrawable();
+                  bg.setColor(user ? Color.rgb(14, 116, 144) : Color.rgb(30, 41, 59));
+                  bg.setCornerRadius(20);
+                  tv.setBackground(bg);
+                  tv.setPadding(18, 14, 18, 14);
+                  wrap.addView(tv);
+                  Button copy = button(user ? "复制我的消息" : "复制 AI 回复");
+                  copy.setOnClickListener(v -> copyText(user ? "我的消息" : "AI 回复", content));
+                  wrap.addView(copy);
+                  LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                          LinearLayout.LayoutParams.MATCH_PARENT,
+                          LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  lp.setMargins(0, 8, 0, 8);
+                  wrap.setLayoutParams(lp);
+                  return wrap;
+              }
+          
+              private void saveAiSettings() {
+                  pref.edit()
+                          .putString("aiApiUrl", apiUrlInput.getText().toString().trim())
+                          .putString("aiApiKey", apiKeyInput.getText().toString().trim())
+                          .putString("aiModel", modelInput.getText().toString().trim())
+                          .putString("aiSystemPrompt", systemPromptInput.getText().toString().trim())
+                          .apply();
+              }
+          
+              private void fillDefaultAiSettings() {
+                  apiUrlInput.setText("https://openrouter.ai/api/v1/chat/completions");
+                  modelInput.setText("openrouter/free");
+                  if (systemPromptInput.getText().toString().trim().isEmpty()) {
+                      systemPromptInput.setText("你是一个耐心、有逻辑、说中文的智能助手。回答要清晰、实用、不过度啰嗦。");
+                  }
+                  showStatus("已填入 OpenRouter 免费模型默认配置");
+              }
+          
+              private void loadAiMessages() {
+                  try {
+                      aiMessages = new JSONArray(pref.getString("aiMessages", "[]"));
+                  } catch (Exception e) {
+                      aiMessages = new JSONArray();
+                  }
+              }
+          
+              private void saveAiMessages() {
+                  pref.edit().putString("aiMessages", aiMessages.toString()).apply();
+              }
+          
+              private String shortError(String value) {
+                  if (value == null) return "未知错误";
+                  String cleaned = value.replace("\n", " ").trim();
+                  if (cleaned.length() > 500) return cleaned.substring(0, 500) + "...";
+                  return cleaned;
+              }
+          
+              private void copyText(String label, String value) {
+                  ClipboardManager manager = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                  if (manager != null) {
+                      manager.setPrimaryClip(ClipData.newPlainText(label, value));
+                      showStatus("已复制：" + label);
+                  }
+              }
+          
+              private void openUrl(String url) {
+                  try {
+                      startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+                  } catch (Exception e) {
+                      toast("打不开这个网址");
+                  }
+              }
+          
+              private void ensureDefaults() {
+                  if (!pref.getBoolean("defaultsReady", false)) {
+                      JSONArray texts = new JSONArray();
+                      addDefaultText(texts, "GitHub Actions 文件名", ".github/workflows/build-apk.yml");
+                      addDefaultText(texts, "OpenRouter API 地址", "https://openrouter.ai/api/v1/chat/completions");
+                      addDefaultText(texts, "OpenRouter 免费模型", "openrouter/free");
+                      JSONArray links = new JSONArray();
+                      addDefaultLink(links, "GitHub", "https://github.com");
+                      addDefaultLink(links, "OpenRouter", "https://openrouter.ai");
+                      addDefaultLink(links, "OpenRouter Keys", "https://openrouter.ai/settings/keys");
+                      addDefaultLink(links, "DeepSeek API", "https://platform.deepseek.com");
+                      addDefaultLink(links, "Netlify Drop", "https://app.netlify.com/drop");
+                      pref.edit()
+                              .putString("texts", texts.toString())
+                              .putString("links", links.toString())
+                              .putBoolean("defaultsReady", true)
+                              .putInt("pomoFocusMin", 25)
+                              .putInt("pomoRestMin", 5)
+                              .apply();
+                  }
+              }
+          
+              private void refreshDefaultContentFor17() {
+                  if (pref.getBoolean("defaultsV17Ready", false)) return;
+                  JSONArray oldTexts = loadArray("texts");
+                  JSONArray newTexts = new JSONArray();
+                  for (int i = 0; i < oldTexts.length(); i++) {
+                      try {
+                          JSONObject obj = oldTexts.getJSONObject(i);
+                          String title = obj.optString("title", "");
+                          String content = obj.optString("content", "");
+                          if (title.contains("添加 APK 打包流程") || title.contains("升级版本")) continue;
+                          if ("添加安卓APK打包流程".equals(content) || "升级版本".equals(content)) continue;
+                          newTexts.put(obj);
+                      } catch (Exception ignored) {}
+                  }
+                  saveArray("texts", newTexts);
+          
+                  JSONArray links = loadArray("links");
+                  addLinkIfMissing(links, "Netlify", "https://www.netlify.com");
+                  addLinkIfMissing(links, "WebIntoApp 网页封装", "https://www.webintoapp.com");
+                  saveArray("links", links);
+                  pref.edit().putBoolean("defaultsV17Ready", true).apply();
+              }
+          
+              private void refreshDefaultContentFor171() {
+                  if (pref.getBoolean("defaultsV171Ready", false)) return;
+                  JSONArray oldLinks = loadArray("links");
+                  JSONArray newLinks = new JSONArray();
+                  for (int i = 0; i < oldLinks.length(); i++) {
+                      try {
+                          JSONObject obj = oldLinks.getJSONObject(i);
+                          String title = obj.optString("title", "");
+                          String url = obj.optString("url", "");
+                          if ("Netlify".equals(title) || "https://www.netlify.com".equalsIgnoreCase(url)) continue;
+                          if (title.contains("WebIntoApp") || "https://www.webintoapp.com".equalsIgnoreCase(url)) continue;
+                          newLinks.put(obj);
+                      } catch (Exception ignored) {}
+                  }
+                  addLinkIfMissing(newLinks, "Netlify Drop", "https://app.netlify.com/drop");
+                  saveArray("links", newLinks);
+                  pref.edit().putBoolean("defaultsV171Ready", true).apply();
+              }
+          
+              private void addLinkIfMissing(JSONArray array, String title, String url) {
+                  for (int i = 0; i < array.length(); i++) {
+                      try {
+                          JSONObject obj = array.getJSONObject(i);
+                          if (url.equalsIgnoreCase(obj.optString("url", "")) || title.equals(obj.optString("title", ""))) {
+                              return;
+                          }
+                      } catch (Exception ignored) {}
+                  }
+                  addDefaultLink(array, title, url);
+              }
+          
+              private void addDefaultText(JSONArray array, String title, String content) {
+                  try {
+                      JSONObject obj = new JSONObject();
+                      obj.put("title", title);
+                      obj.put("content", content);
+                      array.put(obj);
+                  } catch (Exception ignored) {}
+              }
+          
+              private void addDefaultLink(JSONArray array, String title, String url) {
+                  try {
+                      JSONObject obj = new JSONObject();
+                      obj.put("title", title);
+                      obj.put("url", url);
+                      array.put(obj);
+                  } catch (Exception ignored) {}
+              }
+          
+              private JSONArray loadArray(String key) {
+                  try {
+                      return new JSONArray(pref.getString(key, "[]"));
+                  } catch (Exception e) {
+                      return new JSONArray();
+                  }
+              }
+          
+              private void saveArray(String key, JSONArray array) {
+                  pref.edit().putString(key, array.toString()).apply();
+              }
+          
+              private void removeItem(String key, int index) {
+                  JSONArray source = loadArray(key);
+                  JSONArray result = new JSONArray();
+                  for (int i = 0; i < source.length(); i++) {
+                      if (i == index) continue;
+                      try {
+                          result.put(source.getJSONObject(i));
+                      } catch (Exception ignored) {}
+                  }
+                  saveArray(key, result);
+              }
+          
+              private String preview(String value) {
+                  String cleaned = value.trim();
+                  if (cleaned.length() <= 120) return cleaned;
+                  return cleaned.substring(0, 120) + "...";
+              }
+          
+              private void showPage(String pageName) {
+                  currentPage = pageName;
+                  hideKeyboard();
+                  hideStatus();
+                  boolean aiVisible = "ai".equals(pageName);
+                  rootScroll.setVisibility(aiVisible ? View.GONE : View.VISIBLE);
+                  homePage.setVisibility("home".equals(pageName) ? View.VISIBLE : View.GONE);
+                  splitPage.setVisibility("split".equals(pageName) ? View.VISIBLE : View.GONE);
+                  textPage.setVisibility("text".equals(pageName) ? View.VISIBLE : View.GONE);
+                  linkPage.setVisibility("link".equals(pageName) ? View.VISIBLE : View.GONE);
+                  timerPage.setVisibility("timer".equals(pageName) ? View.VISIBLE : View.GONE);
+                  pomoPage.setVisibility("pomo".equals(pageName) ? View.VISIBLE : View.GONE);
+                  aiPage.setVisibility(aiVisible ? View.VISIBLE : View.GONE);
+                  aiSettingsPage.setVisibility("aiSettings".equals(pageName) ? View.VISIBLE : View.GONE);
+                  backupPage.setVisibility("backup".equals(pageName) ? View.VISIBLE : View.GONE);
+                  if (aiVisible && aiMessageScroll != null) {
+                      aiMessageScroll.post(() -> aiMessageScroll.smoothScrollTo(0, aiMessageList.getBottom()));
+                  } else if (rootScroll != null) {
+                      rootScroll.post(() -> rootScroll.smoothScrollTo(0, 0));
+                  }
+              }
+          
+              @Override
+              public void onBackPressed() {
+                  if (!"home".equals(currentPage)) {
+                      showPage("home");
+                  } else {
+                      long now = SystemClock.elapsedRealtime();
+                      if (now - lastBackPressedAt < 1800) {
+                          super.onBackPressed();
+                      } else {
+                          lastBackPressedAt = now;
+                          showStatus("再按一次退出");
+                      }
+                  }
+              }
+          
+              private void showStatus(String message) {
+                  toast(message);
+              }
+          
+              private void hideStatus() {
+                  if (statusText == null) return;
+                  statusText.setVisibility(View.GONE);
+              }
+          
+              private TextView text(String value, int sp, int color) {
+                  TextView tv = new TextView(this);
+                  tv.setText(value);
+                  tv.setTextSize(sp);
+                  tv.setTextColor(color);
+                  tv.setPadding(0, 10, 0, 10);
+                  return tv;
+              }
+          
+              private TextView sectionTitle(String value) {
+                  TextView tv = text(value, 22, Color.WHITE);
+                  tv.setTypeface(Typeface.DEFAULT_BOLD);
+                  tv.setPadding(0, 28, 0, 10);
+                  return tv;
+              }
+          
+              private TextView infoCard(String value) {
+                  TextView tv = text(value, 14, Color.LTGRAY);
+                  GradientDrawable bg = new GradientDrawable();
+                  bg.setColor(Color.rgb(15, 23, 42));
+                  bg.setStroke(2, Color.rgb(51, 65, 85));
+                  bg.setCornerRadius(18);
+                  tv.setBackground(bg);
+                  tv.setPadding(18, 16, 18, 16);
+                  return tv;
+              }
+          
+              private Button button(String value) {
+                  Button b = new Button(this);
+                  b.setText(value);
+                  b.setTextSize(14);
+                  b.setAllCaps(false);
+                  b.setTextColor(Color.WHITE);
+                  GradientDrawable bg = new GradientDrawable(
+                          GradientDrawable.Orientation.LEFT_RIGHT,
+                          new int[]{Color.rgb(14, 165, 233), Color.rgb(16, 185, 129)}
+                  );
+                  bg.setCornerRadius(22);
+                  b.setBackground(bg);
+                  b.setPadding(6, 8, 6, 8);
+                  return b;
+              }
+          
+              private EditText inputBox(String hint) {
+                  EditText e = new EditText(this);
+                  e.setHint(hint);
+                  e.setTextColor(Color.WHITE);
+                  e.setHintTextColor(Color.rgb(148, 163, 184));
+                  e.setTextSize(16);
+                  GradientDrawable bg = new GradientDrawable();
+                  bg.setColor(Color.rgb(15, 23, 42));
+                  bg.setStroke(2, Color.rgb(51, 65, 85));
+                  bg.setCornerRadius(18);
+                  e.setBackground(bg);
+                  e.setPadding(16, 12, 16, 12);
+                  e.setOnFocusChangeListener((view, hasFocus) -> {
+                      if (hasFocus) {
+                          view.postDelayed(() -> scrollFocusedInputIntoView(view), 300);
+                      }
+                  });
+                  return e;
+              }
+          
+              private void installKeyboardGuard() {
+                  final View rootView = rootFrame;
+                  rootView.getViewTreeObserver().addOnGlobalLayoutListener(() -> {
+                      Rect visible = new Rect();
+                      rootView.getWindowVisibleDisplayFrame(visible);
+                      int screenHeight = rootView.getRootView().getHeight();
+                      int keyboardHeight = Math.max(0, screenHeight - visible.bottom);
+                      boolean keyboardOpen = keyboardHeight > screenHeight * 0.15f;
+                      adjustAiInputForKeyboard(visible, keyboardOpen);
+                      int bottomPadding = keyboardOpen ? keyboardHeight + 420 : rootBaseBottomPadding;
+                      rootContainer.setPadding(
+                              rootContainer.getPaddingLeft(),
+                              rootContainer.getPaddingTop(),
+                              rootContainer.getPaddingRight(),
+                              bottomPadding
+                      );
+                      if (keyboardOpen && !"ai".equals(currentPage) && getCurrentFocus() instanceof EditText) {
+                          rootScroll.postDelayed(() -> scrollFocusedInputIntoView(getCurrentFocus()), 80);
+                      }
+                  });
+              }
+          
+              private void adjustAiInputForKeyboard(Rect visible, boolean keyboardOpen) {
+                  if (aiPage == null || aiInputArea == null) return;
+                  if (!"ai".equals(currentPage) || !keyboardOpen) {
+                      aiInputArea.setTranslationY(0);
+                      aiPage.setPadding(
+                              aiPage.getPaddingLeft(),
+                              aiPage.getPaddingTop(),
+                              aiPage.getPaddingRight(),
+                              aiBaseBottomPadding
+                      );
+                      return;
+                  }
+                  int screenHeight = rootFrame.getRootView().getHeight();
+                  int keyboardHeight = Math.max(0, screenHeight - visible.bottom);
+                  aiInputArea.setTranslationY(0);
+                  aiPage.setPadding(
+                          aiPage.getPaddingLeft(),
+                          aiPage.getPaddingTop(),
+                          aiPage.getPaddingRight(),
+                          keyboardHeight + aiBaseBottomPadding + 18
+                  );
+                  if (aiMessageScroll != null && aiMessageList != null) {
+                      aiMessageScroll.post(() -> aiMessageScroll.smoothScrollTo(0, aiMessageList.getBottom()));
+                  }
+              }
+          
+              private void scrollFocusedInputIntoView(View view) {
+                  if (view == null || rootScroll == null) return;
+                  if ("ai".equals(currentPage)) {
+                      view.requestRectangleOnScreen(new Rect(0, 0, view.getWidth(), view.getHeight()), true);
+                      return;
+                  }
+                  int[] scrollLocation = new int[2];
+                  int[] viewLocation = new int[2];
+                  rootScroll.getLocationOnScreen(scrollLocation);
+                  view.getLocationOnScreen(viewLocation);
+                  int viewBottom = viewLocation[1] - scrollLocation[1] + view.getHeight();
+                  Rect visible = new Rect();
+                  rootScroll.getWindowVisibleDisplayFrame(visible);
+                  int safeBottom = visible.bottom - scrollLocation[1] - 180;
+                  if (viewBottom > safeBottom) {
+                      rootScroll.smoothScrollBy(0, viewBottom - safeBottom + 160);
+                  }
+              }
+          
+              private LinearLayout card() {
+                  LinearLayout card = new LinearLayout(this);
+                  card.setOrientation(LinearLayout.VERTICAL);
+                  card.setPadding(16, 14, 16, 14);
+                  GradientDrawable bg = new GradientDrawable();
+                  bg.setColor(Color.rgb(15, 23, 42));
+                  bg.setStroke(2, Color.rgb(51, 65, 85));
+                  bg.setCornerRadius(18);
+                  card.setBackground(bg);
+                  LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                          LinearLayout.LayoutParams.MATCH_PARENT,
+                          LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  lp.setMargins(0, 10, 0, 10);
+                  card.setLayoutParams(lp);
+                  return card;
+              }
+          
+              private LinearLayout labelWrap(String label, View child) {
+                  LinearLayout wrap = new LinearLayout(this);
+                  wrap.setOrientation(LinearLayout.VERTICAL);
+                  wrap.addView(text(label, 14, Color.LTGRAY));
+                  wrap.addView(child);
+                  return wrap;
+              }
+          
+              private LinearLayout row() {
+                  LinearLayout row = new LinearLayout(this);
+                  row.setOrientation(LinearLayout.HORIZONTAL);
+                  row.setGravity(Gravity.CENTER);
+                  row.setPadding(0, 8, 0, 8);
+                  return row;
+              }
+          
+              private LinearLayout page() {
+                  LinearLayout page = new LinearLayout(this);
+                  page.setOrientation(LinearLayout.VERTICAL);
+                  return page;
+              }
+          
+              private LinearLayout.LayoutParams weight() {
+                  return new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+              }
+          
+              private int parseInt(String value, int fallback) {
+                  try {
+                      return Integer.parseInt(value.trim());
+                  } catch (Exception e) {
+                      return fallback;
+                  }
+              }
+          
+              private void hideKeyboard() {
+                  try {
+                      InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                      View view = getCurrentFocus();
+                      if (imm != null && view != null) imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+                  } catch (Exception ignored) {}
+              }
+          
+              private void buzz() {
+                  try {
+                      Vibrator vibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
+                      if (vibrator != null) vibrator.vibrate(600);
+                  } catch (Exception ignored) {}
+              }
+          
+              private void toast(String value) {
+                  Toast.makeText(this, value, Toast.LENGTH_SHORT).show();
+              }
+          }
+          TRAE_FILE_app_src_main_java_com_trae_phonehelper_MainActivity_java
+
+      - name: 安装 Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: 安装 Android 平台
+        shell: bash
         run: |
-          gradle wrapper --gradle-version 8.7 --distribution-type bin
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
 
       - name: 构建 APK
-        working-directory: phone-helper
-        run: |
-          ./gradlew assembleDebug --no-daemon
+        run: gradle assembleDebug
 
       - name: 上传 APK
         uses: actions/upload-artifact@v4
         with:
-          name: 手机助手工具箱-APK
-          path: phone-helper/app/build/outputs/apk/debug/app-debug.apk
+          name: phone-helper-toolbox-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
