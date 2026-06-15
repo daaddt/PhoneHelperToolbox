@@ -70,8 +70,8 @@ jobs:
                   applicationId "com.trae.phonehelper"
                   minSdk 26
                   targetSdk 35
-                  versionCode 26
-                  versionName "1.8.2"
+                  versionCode 27
+                  versionName "1.8.3"
               }
           }
           TRAE_FILE_app_build_gradle
@@ -1506,7 +1506,6 @@ jobs:
                   tv.setBackground(bg);
                   tv.setPadding(18, 14, 18, 14);
                   tv.setClipToOutline(true);
-                  tv.setClipToPadding(true);
                   tv.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
                   wrap.addView(tv);
                   if (!streaming) {
