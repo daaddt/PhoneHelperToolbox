@@ -70,8 +70,8 @@ jobs:
                   applicationId "com.trae.phonehelper"
                   minSdk 26
                   targetSdk 35
-                  versionCode 13
-                  versionName "1.6"
+                  versionCode 14
+                  versionName "1.6.1"
               }
           }
           EOF_app_build_gradle
@@ -202,6 +202,7 @@ jobs:
               private String currentPage = "home";
               private int editingTextIndex = -1;
               private int editingLinkIndex = -1;
+              private final Runnable hideStatusRunnable = this::hideStatus;
           
               private final Runnable tick = new Runnable() {
                   @Override
@@ -252,15 +253,8 @@ jobs:
                   rootContainer.setPadding(24, 34, 24, rootBaseBottomPadding);
                   rootScroll.addView(rootContainer);
           
-                  TextView title = text("手机助手工具箱", 32, Color.WHITE);
-                  title.setTypeface(Typeface.DEFAULT_BOLD);
-                  title.setGravity(Gravity.CENTER_HORIZONTAL);
-                  rootContainer.addView(title);
-                  TextView subtitle = text("复制 · 快捷 · 计时 · 番茄钟 · AI", 14, Color.rgb(148, 163, 184));
-                  subtitle.setGravity(Gravity.CENTER_HORIZONTAL);
-                  rootContainer.addView(subtitle);
-          
-                  statusText = text("准备就绪", 14, Color.rgb(52, 211, 153));
+                  statusText = text("", 14, Color.rgb(52, 211, 153));
+                  statusText.setVisibility(View.GONE);
                   rootContainer.addView(statusText);
           
                   homePage = page();
@@ -298,10 +292,11 @@ jobs:
               }
           
               private void buildHomePage() {
-                  TextView homeTitle = sectionTitle("首页");
+                  TextView homeTitle = text("手机助手工具箱", 30, Color.WHITE);
+                  homeTitle.setTypeface(Typeface.DEFAULT_BOLD);
                   homeTitle.setGravity(Gravity.CENTER_HORIZONTAL);
                   homePage.addView(homeTitle);
-                  TextView homeTip = text("选择一个工具开始使用", 14, Color.rgb(148, 163, 184));
+                  TextView homeTip = text("选择一个工具", 14, Color.rgb(148, 163, 184));
                   homeTip.setGravity(Gravity.CENTER_HORIZONTAL);
                   homePage.addView(homeTip);
                   homePage.addView(sectionTitle("常用工具"));
@@ -358,7 +353,7 @@ jobs:
                   clear.setOnClickListener(v -> {
                       longTextInput.setText("");
                       splitResultList.removeAllViews();
-                      statusText.setText("已清空");
+                      showStatus("已清空");
                   });
               }
           
@@ -503,7 +498,7 @@ jobs:
                   done.setOnClickListener(v -> finishOnePomo());
                   pomoLoopCheck.setOnCheckedChangeListener((buttonView, isChecked) -> {
                       pref.edit().putBoolean("pomoLoop", isChecked).apply();
-                      statusText.setText(isChecked ? "休息结束后会自动进入下一轮专注" : "休息结束后会暂停，等待手动开始");
+                      showStatus(isChecked ? "休息结束后会自动进入下一轮专注" : "休息结束后会暂停，等待手动开始");
                   });
                   updatePomoDisplay();
               }
@@ -532,7 +527,7 @@ jobs:
                       aiMessages = new JSONArray();
                       saveAiMessages();
                       renderAiMessages();
-                      statusText.setText("AI 对话已清空");
+                      showStatus("AI 对话已清空");
                   });
                   renderAiMessages();
               }
@@ -572,7 +567,7 @@ jobs:
           
                   save.setOnClickListener(v -> {
                       saveAiSettings();
-                      statusText.setText("AI 设置已保存");
+                      showStatus("AI 设置已保存");
                       showPage("ai");
                   });
                   test.setOnClickListener(v -> {
@@ -653,11 +648,11 @@ jobs:
                       String content = readAll(inputStream);
                       longTextInput.setText(content);
                       splitResultList.removeAllViews();
-                      statusText.setText("已导入文件，共 " + content.length() + " 字");
+                      showStatus("已导入文件，共 " + content.length() + " 字");
                       toast("导入成功");
                       showPage("split");
                   } catch (Exception e) {
-                      statusText.setText("导入失败：" + shortError(e.getMessage()));
+                      showStatus("导入失败：" + shortError(e.getMessage()));
                       toast("导入失败");
                   }
               }
@@ -673,10 +668,10 @@ jobs:
                       backup.put("texts", loadArray("texts"));
                       backup.put("links", loadArray("links"));
                       outputStream.write(backup.toString(2).getBytes(StandardCharsets.UTF_8));
-                      statusText.setText("备份已导出");
+                      showStatus("备份已导出");
                       toast("导出成功");
                   } catch (Exception e) {
-                      statusText.setText("导出失败：" + shortError(e.getMessage()));
+                      showStatus("导出失败：" + shortError(e.getMessage()));
                       toast("导出失败");
                   }
               }
@@ -698,10 +693,10 @@ jobs:
                       if (links != null) saveArray("links", links);
                       renderSavedTexts();
                       renderLinks();
-                      statusText.setText("备份已导入");
+                      showStatus("备份已导入");
                       toast("导入成功");
                   } catch (Exception e) {
-                      statusText.setText("导入失败：" + shortError(e.getMessage()));
+                      showStatus("导入失败：" + shortError(e.getMessage()));
                       toast("导入失败");
                   }
               }
@@ -724,7 +719,7 @@ jobs:
                       splitResultList.addView(chunkCard(count, chunk));
                   }
                   hideKeyboard();
-                  statusText.setText("已生成 " + count + " 段");
+                  showStatus("已生成 " + count + " 段");
               }
           
               private View chunkCard(int index, String chunk) {
@@ -764,7 +759,7 @@ jobs:
                   cancelTextEditStateOnly();
                   renderSavedTexts();
                   hideKeyboard();
-                  statusText.setText(edited ? "已保存常用文本修改" : "已添加常用文本");
+                  showStatus(edited ? "已保存常用文本修改" : "已添加常用文本");
               }
           
               private void renderSavedTexts() {
@@ -795,7 +790,7 @@ jobs:
                       if (editingTextIndex == index) cancelTextEditStateOnly();
                       removeItem("texts", index);
                       renderSavedTexts();
-                      statusText.setText("已删除常用文本");
+                      showStatus("已删除常用文本");
                   });
                   actions.addView(copy, weight());
                   actions.addView(edit, weight());
@@ -810,7 +805,7 @@ jobs:
                   contentInput.setText(content);
                   textSaveButton.setText("保存修改");
                   textCancelEditButton.setVisibility(View.VISIBLE);
-                  statusText.setText("正在编辑常用文本");
+                  showStatus("正在编辑常用文本");
                   showPage("text");
               }
           
@@ -818,7 +813,7 @@ jobs:
                   titleInput.setText("");
                   contentInput.setText("");
                   cancelTextEditStateOnly();
-                  statusText.setText("已取消编辑");
+                  showStatus("已取消编辑");
               }
           
               private void cancelTextEditStateOnly() {
@@ -853,7 +848,7 @@ jobs:
                   cancelLinkEditStateOnly();
                   renderLinks();
                   hideKeyboard();
-                  statusText.setText(edited ? "已保存快捷链接修改" : "已添加快捷链接");
+                  showStatus(edited ? "已保存快捷链接修改" : "已添加快捷链接");
               }
           
               private void renderLinks() {
@@ -886,7 +881,7 @@ jobs:
                       if (editingLinkIndex == index) cancelLinkEditStateOnly();
                       removeItem("links", index);
                       renderLinks();
-                      statusText.setText("已删除快捷链接");
+                      showStatus("已删除快捷链接");
                   });
                   actions.addView(open, weight());
                   actions.addView(copy, weight());
@@ -902,7 +897,7 @@ jobs:
                   linkUrlInput.setText(url);
                   linkSaveButton.setText("保存修改");
                   linkCancelEditButton.setVisibility(View.VISIBLE);
-                  statusText.setText("正在编辑快捷链接");
+                  showStatus("正在编辑快捷链接");
                   showPage("link");
               }
           
@@ -910,7 +905,7 @@ jobs:
                   linkTitleInput.setText("");
                   linkUrlInput.setText("");
                   cancelLinkEditStateOnly();
-                  statusText.setText("已取消编辑");
+                  showStatus("已取消编辑");
               }
           
               private void cancelLinkEditStateOnly() {
@@ -996,7 +991,7 @@ jobs:
                       countdownRunning = false;
                       countdownElapsed = countdownDuration;
                       buzz();
-                      statusText.setText("倒计时结束");
+                      showStatus("倒计时结束");
                   }
                   boolean stopwatch = "stopwatch".equals(timerMode);
                   stopwatchTab.setAlpha(stopwatch ? 1f : 0.55f);
@@ -1023,7 +1018,7 @@ jobs:
                   pomoDuration = focusMin * 60 * 1000L;
                   pomoElapsed = 0;
                   updatePomoDisplay();
-                  statusText.setText("番茄钟设置已应用");
+                  showStatus("番茄钟设置已应用");
               }
           
               private void togglePomo() {
@@ -1056,7 +1051,7 @@ jobs:
                   pomoElapsed = 0;
                   updatePomoDisplay();
                   savePomoState();
-                  statusText.setText("已记录完成 1 个番茄");
+                  showStatus("已记录完成 1 个番茄");
               }
           
               private long getPomoElapsed() {
@@ -1079,7 +1074,7 @@ jobs:
                           pomoElapsed = 0;
                           pomoRunning = true;
                           pomoStartedAt = SystemClock.elapsedRealtime();
-                          statusText.setText("专注完成，开始休息吧");
+                          showStatus("专注完成，开始休息吧");
                       } else {
                           boolean autoLoop = pref.getBoolean("pomoLoop", true);
                           pomoFocus = true;
@@ -1087,7 +1082,7 @@ jobs:
                           pomoElapsed = 0;
                           pomoRunning = autoLoop;
                           if (autoLoop) pomoStartedAt = SystemClock.elapsedRealtime();
-                          statusText.setText(autoLoop ? "休息结束，已开始下一轮专注" : "休息结束，等待手动开始下一轮");
+                          showStatus(autoLoop ? "休息结束，已开始下一轮专注" : "休息结束，等待手动开始下一轮");
                       }
                       savePomoState();
                   }
@@ -1191,7 +1186,7 @@ jobs:
                   String value = aiInput.getText().toString().trim();
                   if (value.isEmpty() || aiSending) return;
                   if (pref.getString("aiApiKey", "").trim().isEmpty()) {
-                      statusText.setText("请先在 AI设置 里填写 API Key");
+                      showStatus("请先在 AI设置 里填写 API Key");
                       showPage("aiSettings");
                       return;
                   }
@@ -1203,7 +1198,7 @@ jobs:
           
               private void testAiConnection() {
                   if (pref.getString("aiApiKey", "").trim().isEmpty()) {
-                      statusText.setText("请先填写 API Key");
+                      showStatus("请先填写 API Key");
                       showPage("aiSettings");
                       return;
                   }
@@ -1215,20 +1210,20 @@ jobs:
               private void callAi(boolean testMode) {
                   aiSending = true;
                   updateAiSendingUi();
-                  statusText.setText(testMode ? "正在测试 AI 连接..." : "AI 正在思考...");
+                  showStatus(testMode ? "正在测试 AI 连接..." : "AI 正在思考...");
                   new Thread(() -> {
                       try {
                           String reply = requestAiCompletion();
                           runOnUiThread(() -> {
                               appendAiMessage("assistant", reply);
-                              statusText.setText("AI 回复完成");
+                              showStatus("AI 回复完成");
                               aiSending = false;
                               updateAiSendingUi();
                           });
                       } catch (Exception e) {
                           runOnUiThread(() -> {
                               appendAiMessage("assistant", "请求失败：" + shortError(e.getMessage()));
-                              statusText.setText("AI 请求失败，请检查 API 设置");
+                              showStatus("AI 请求失败，请检查 API 设置");
                               aiSending = false;
                               updateAiSendingUi();
                           });
@@ -1366,7 +1361,7 @@ jobs:
                   if (systemPromptInput.getText().toString().trim().isEmpty()) {
                       systemPromptInput.setText("你是一个耐心、有逻辑、说中文的智能助手。回答要清晰、实用、不过度啰嗦。");
                   }
-                  statusText.setText("已填入 OpenRouter 免费模型默认配置");
+                  showStatus("已填入 OpenRouter 免费模型默认配置");
               }
           
               private void loadAiMessages() {
@@ -1392,7 +1387,7 @@ jobs:
                   ClipboardManager manager = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
                   if (manager != null) {
                       manager.setPrimaryClip(ClipData.newPlainText(label, value));
-                      statusText.setText("已复制：" + label);
+                      showStatus("已复制：" + label);
                       toast("已复制");
                   }
               }
@@ -1479,6 +1474,7 @@ jobs:
               private void showPage(String pageName) {
                   currentPage = pageName;
                   hideKeyboard();
+                  hideStatus();
                   homePage.setVisibility("home".equals(pageName) ? View.VISIBLE : View.GONE);
                   splitPage.setVisibility("split".equals(pageName) ? View.VISIBLE : View.GONE);
                   textPage.setVisibility("text".equals(pageName) ? View.VISIBLE : View.GONE);
@@ -1498,6 +1494,19 @@ jobs:
                   } else {
                       super.onBackPressed();
                   }
+              }
+          
+              private void showStatus(String message) {
+                  if (statusText == null) return;
+                  statusText.setText(message);
+                  statusText.setVisibility(View.VISIBLE);
+                  handler.removeCallbacks(hideStatusRunnable);
+                  handler.postDelayed(hideStatusRunnable, 2600);
+              }
+          
+              private void hideStatus() {
+                  if (statusText == null) return;
+                  statusText.setVisibility(View.GONE);
               }
           
               private TextView text(String value, int sp, int color) {
