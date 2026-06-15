@@ -70,8 +70,8 @@ jobs:
                   applicationId "com.trae.phonehelper"
                   minSdk 26
                   targetSdk 35
-                  versionCode 11
-                  versionName "1.5"
+                  versionCode 12
+                  versionName "1.5.1"
               }
           }
           EOF_app_build_gradle
@@ -199,6 +199,7 @@ jobs:
               private JSONArray aiMessages = new JSONArray();
               private boolean aiSending = false;
               private int rootBaseBottomPadding = 28;
+              private String currentPage = "home";
           
               private final Runnable tick = new Runnable() {
                   @Override
@@ -295,8 +296,12 @@ jobs:
               }
           
               private void buildHomePage() {
-                  homePage.addView(sectionTitle("功能目录"));
-                  homePage.addView(infoCard("这是你的手机操作增强工具箱。常用复制、网址打开、计时、番茄钟和 AI 都放在这里。"));
+                  TextView homeTitle = sectionTitle("首页");
+                  homeTitle.setGravity(Gravity.CENTER_HORIZONTAL);
+                  homePage.addView(homeTitle);
+                  TextView homeTip = text("选择一个工具开始使用", 14, Color.rgb(148, 163, 184));
+                  homeTip.setGravity(Gravity.CENTER_HORIZONTAL);
+                  homePage.addView(homeTip);
                   homePage.addView(sectionTitle("常用工具"));
                   homePage.addView(homeButton("分段复制", "把长代码、长提示词、工作流自动拆成多段复制", "split"));
                   homePage.addView(homeButton("常用文本", "保存 API 地址、模型名、提交信息等常用内容", "text"));
@@ -312,18 +317,19 @@ jobs:
           
               private View homeButton(String title, String desc, String pageName) {
                   LinearLayout card = card();
-                  TextView t = text(title, 20, Color.WHITE);
+                  TextView t = text(title, 18, Color.WHITE);
                   t.setTypeface(Typeface.DEFAULT_BOLD);
                   card.addView(t);
-                  card.addView(text(desc, 14, Color.LTGRAY));
-                  Button open = button("打开 " + title);
-                  open.setOnClickListener(v -> showPage(pageName));
-                  card.addView(open);
+                  card.addView(text(desc, 13, Color.rgb(148, 163, 184)));
+                  TextView hint = text("点按进入", 13, Color.rgb(52, 211, 153));
+                  hint.setGravity(Gravity.RIGHT);
+                  card.addView(hint);
+                  card.setClickable(true);
+                  card.setOnClickListener(v -> showPage(pageName));
                   return card;
               }
           
               private void buildSplitPage() {
-                  splitPage.addView(backHomeButton());
                   splitPage.addView(sectionTitle("长文本分段复制"));
                   splitPage.addView(infoCard("把很长的代码、工作流、提示词粘到这里，App 会自动分段，每段都有复制按钮。"));
                   longTextInput = inputBox("粘贴长文本");
@@ -355,7 +361,6 @@ jobs:
               }
           
               private void buildTextPage() {
-                  textPage.addView(backHomeButton());
                   textPage.addView(sectionTitle("常用文本"));
                   textPage.addView(infoCard("保存常用路径、API 地址、模型名、提交信息。以后点一下就能复制。"));
                   titleInput = inputBox("标题，例如 OpenRouter API 地址");
@@ -374,7 +379,6 @@ jobs:
               }
           
               private void buildLinkPage() {
-                  linkPage.addView(backHomeButton());
                   linkPage.addView(sectionTitle("快捷打开"));
                   linkPage.addView(infoCard("保存常用网站，一键打开 GitHub、OpenRouter、Actions 等页面。"));
                   linkTitleInput = inputBox("标题，例如 GitHub");
@@ -392,7 +396,6 @@ jobs:
               }
           
               private void buildTimerPage() {
-                  timerPage.addView(backHomeButton());
                   timerPage.addView(sectionTitle("计时器"));
                   timerPage.addView(infoCard("包含正计时、倒计时和快速倒计时。适合临时计时，不替代闹钟。"));
                   LinearLayout modeRow = row();
@@ -447,7 +450,6 @@ jobs:
               }
           
               private void buildPomoPage() {
-                  pomoPage.addView(backHomeButton());
                   pomoPage.addView(sectionTitle("番茄钟"));
                   pomoPage.addView(infoCard("默认专注 25 分钟、休息 5 分钟。适合学习节奏管理。"));
                   pomoStateText = text("准备开始专注", 18, Color.rgb(125, 211, 252));
@@ -497,7 +499,6 @@ jobs:
               }
           
               private void buildAiPage() {
-                  aiPage.addView(backHomeButton());
                   aiPage.addView(sectionTitle("AI聊天"));
                   aiPage.addView(infoCard("这里使用 OpenAI 兼容接口。首次使用请先进入 AI设置，填写 API Key。"));
                   aiMessageList = new LinearLayout(this);
@@ -527,7 +528,6 @@ jobs:
               }
           
               private void buildAiSettingsPage() {
-                  aiSettingsPage.addView(backHomeButton());
                   aiSettingsPage.addView(sectionTitle("AI设置"));
                   aiSettingsPage.addView(infoCard("API Key 只保存在本机，不会写进 GitHub。推荐模型名保持 openrouter/free。"));
           
@@ -573,7 +573,6 @@ jobs:
               }
           
               private void buildBackupPage() {
-                  backupPage.addView(backHomeButton());
                   backupPage.addView(sectionTitle("数据备份"));
                   backupPage.addView(infoCard("导出和导入常用文本、快捷链接。不会导出 AI Key，避免密钥泄露。"));
                   LinearLayout actions = row();
@@ -585,12 +584,6 @@ jobs:
                   backupPage.addView(infoCard("导出的文件是 JSON 文本。换手机、重装 App 或误删内容时，可以用它恢复常用文本和快捷链接。"));
                   export.setOnClickListener(v -> createBackupFile());
                   importBackup.setOnClickListener(v -> chooseBackupFile());
-              }
-          
-              private Button backHomeButton() {
-                  Button back = button("← 返回首页");
-                  back.setOnClickListener(v -> showPage("home"));
-                  return back;
               }
           
               private void chooseTextFile() {
@@ -1408,6 +1401,8 @@ jobs:
               }
           
               private void showPage(String pageName) {
+                  currentPage = pageName;
+                  hideKeyboard();
                   homePage.setVisibility("home".equals(pageName) ? View.VISIBLE : View.GONE);
                   splitPage.setVisibility("split".equals(pageName) ? View.VISIBLE : View.GONE);
                   textPage.setVisibility("text".equals(pageName) ? View.VISIBLE : View.GONE);
@@ -1418,6 +1413,15 @@ jobs:
                   aiSettingsPage.setVisibility("aiSettings".equals(pageName) ? View.VISIBLE : View.GONE);
                   backupPage.setVisibility("backup".equals(pageName) ? View.VISIBLE : View.GONE);
                   if (rootScroll != null) rootScroll.post(() -> rootScroll.smoothScrollTo(0, 0));
+              }
+          
+              @Override
+              public void onBackPressed() {
+                  if (!"home".equals(currentPage)) {
+                      showPage("home");
+                  } else {
+                      super.onBackPressed();
+                  }
               }
           
               private TextView text(String value, int sp, int color) {
@@ -1491,7 +1495,7 @@ jobs:
                       int screenHeight = rootView.getRootView().getHeight();
                       int keyboardHeight = Math.max(0, screenHeight - visible.bottom);
                       boolean keyboardOpen = keyboardHeight > screenHeight * 0.15f;
-                      int bottomPadding = keyboardOpen ? keyboardHeight + 160 : rootBaseBottomPadding;
+                      int bottomPadding = keyboardOpen ? keyboardHeight + 420 : rootBaseBottomPadding;
                       rootContainer.setPadding(
                               rootContainer.getPaddingLeft(),
                               rootContainer.getPaddingTop(),
@@ -1511,9 +1515,11 @@ jobs:
                   rootScroll.getLocationOnScreen(scrollLocation);
                   view.getLocationOnScreen(viewLocation);
                   int viewBottom = viewLocation[1] - scrollLocation[1] + view.getHeight();
-                  int safeBottom = rootScroll.getHeight() - 260;
+                  Rect visible = new Rect();
+                  rootScroll.getWindowVisibleDisplayFrame(visible);
+                  int safeBottom = visible.bottom - scrollLocation[1] - 180;
                   if (viewBottom > safeBottom) {
-                      rootScroll.smoothScrollBy(0, viewBottom - safeBottom + 80);
+                      rootScroll.smoothScrollBy(0, viewBottom - safeBottom + 160);
                   }
               }
           
