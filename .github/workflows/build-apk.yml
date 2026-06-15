@@ -70,8 +70,8 @@ jobs:
                   applicationId "com.trae.phonehelper"
                   minSdk 26
                   targetSdk 35
-                  versionCode 24
-                  versionName "1.8"
+                  versionCode 25
+                  versionName "1.8.1"
               }
           }
           TRAE_FILE_app_build_gradle
@@ -1296,6 +1296,7 @@ jobs:
                               aiSending = false;
                               streamingAssistantIndex = -1;
                               updateAiSendingUi();
+                              renderAiMessages();
                           });
                       } catch (Exception e) {
                           runOnUiThread(() -> {
@@ -1375,6 +1376,7 @@ jobs:
           
                   StringBuilder full = new StringBuilder();
                   StringBuilder raw = new StringBuilder();
+                  long lastUiUpdate = 0;
                   BufferedReader br = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8));
                   String line;
                   while ((line = br.readLine()) != null) {
@@ -1395,11 +1397,16 @@ jobs:
                           String piece = delta != null ? delta.optString("content", "") : "";
                           if (!piece.isEmpty()) {
                               full.append(piece);
-                              callback.onDelta(full.toString());
+                              long now = SystemClock.elapsedRealtime();
+                              if (now - lastUiUpdate > 90) {
+                                  callback.onDelta(full.toString());
+                                  lastUiUpdate = now;
+                              }
                           }
                       } catch (Exception ignored) {}
                   }
                   String result = full.toString().trim();
+                  if (!result.isEmpty()) callback.onDelta(result);
                   if (!result.isEmpty()) return result;
                   String normal = raw.toString().trim();
                   if (normal.startsWith("{")) return parseNormalAiResponse(normal);
@@ -1462,7 +1469,8 @@ jobs:
                   for (int i = 0; i < aiMessages.length(); i++) {
                       try {
                           JSONObject msg = aiMessages.getJSONObject(i);
-                          aiMessageList.addView(aiBubble(msg.optString("role"), msg.optString("content")));
+                          boolean streaming = aiSending && i == streamingAssistantIndex && "assistant".equals(msg.optString("role"));
+                          aiMessageList.addView(aiBubble(msg.optString("role"), msg.optString("content"), streaming));
                       } catch (Exception ignored) {}
                   }
                   if (aiMessageScroll != null) {
@@ -1486,7 +1494,7 @@ jobs:
                   });
               }
           
-              private View aiBubble(String role, String content) {
+              private View aiBubble(String role, String content, boolean streaming) {
                   boolean user = "user".equals(role);
                   LinearLayout wrap = new LinearLayout(this);
                   wrap.setOrientation(LinearLayout.VERTICAL);
@@ -1497,9 +1505,11 @@ jobs:
                   tv.setBackground(bg);
                   tv.setPadding(18, 14, 18, 14);
                   wrap.addView(tv);
-                  Button copy = button(user ? "复制我的消息" : "复制 AI 回复");
-                  copy.setOnClickListener(v -> copyText(user ? "我的消息" : "AI 回复", content));
-                  wrap.addView(copy);
+                  if (!streaming) {
+                      Button copy = button(user ? "复制我的消息" : "复制 AI 回复");
+                      copy.setOnClickListener(v -> copyText(user ? "我的消息" : "AI 回复", content));
+                      wrap.addView(copy);
+                  }
                   LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                           LinearLayout.LayoutParams.MATCH_PARENT,
                           LinearLayout.LayoutParams.WRAP_CONTENT
