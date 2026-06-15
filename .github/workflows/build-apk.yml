@@ -70,8 +70,8 @@ jobs:
                   applicationId "com.trae.phonehelper"
                   minSdk 26
                   targetSdk 35
-                  versionCode 9
-                  versionName "1.4.4"
+                  versionCode 11
+                  versionName "1.5"
               }
           }
           EOF_app_build_gradle
@@ -127,6 +127,7 @@ jobs:
           import android.content.Intent;
           import android.content.SharedPreferences;
           import android.graphics.Color;
+          import android.graphics.Rect;
           import android.graphics.Typeface;
           import android.graphics.drawable.GradientDrawable;
           import android.net.Uri;
@@ -137,6 +138,7 @@ jobs:
           import android.os.Vibrator;
           import android.view.Gravity;
           import android.view.View;
+          import android.view.WindowManager;
           import android.view.inputmethod.InputMethodManager;
           import android.widget.Button;
           import android.widget.CheckBox;
@@ -170,10 +172,11 @@ jobs:
           
               private LinearLayout homePage, splitPage, textPage, linkPage, timerPage, pomoPage, aiPage, aiSettingsPage, backupPage;
               private LinearLayout splitResultList, savedTextList, linkList, aiMessageList;
+              private ScrollView rootScroll;
+              private LinearLayout rootContainer;
               private EditText longTextInput, splitSizeInput, titleInput, contentInput, linkTitleInput, linkUrlInput;
               private EditText aiInput, apiUrlInput, apiKeyInput, modelInput, systemPromptInput;
               private TextView statusText, timerDisplay, pomoDisplay, pomoStateText, pomoCountText;
-              private Button homeTab, splitTab, textTab, linkTab, timerTab, pomoTab, aiTab, aiSettingsTab, backupTab;
               private Button stopwatchTab, countdownTab, timerStartPause, aiSendButton;
               private CheckBox pomoLoopCheck;
               private EditText timerMinuteInput, timerSecondInput, pomoFocusInput, pomoRestInput;
@@ -195,6 +198,7 @@ jobs:
           
               private JSONArray aiMessages = new JSONArray();
               private boolean aiSending = false;
+              private int rootBaseBottomPadding = 28;
           
               private final Runnable tick = new Runnable() {
                   @Override
@@ -208,6 +212,7 @@ jobs:
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
+                  getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
                   pref = getSharedPreferences(PREF, MODE_PRIVATE);
                   ensureDefaults();
                   restoreTimerState();
@@ -235,51 +240,25 @@ jobs:
               }
           
               private void buildUi() {
-                  ScrollView scroll = new ScrollView(this);
-                  scroll.setFillViewport(true);
-                  scroll.setBackgroundColor(Color.rgb(7, 17, 31));
-                  LinearLayout root = new LinearLayout(this);
-                  root.setOrientation(LinearLayout.VERTICAL);
-                  root.setPadding(24, 34, 24, 28);
-                  scroll.addView(root);
+                  rootScroll = new ScrollView(this);
+                  rootScroll.setFillViewport(false);
+                  rootScroll.setClipToPadding(false);
+                  rootScroll.setBackgroundColor(Color.rgb(7, 17, 31));
+                  rootContainer = new LinearLayout(this);
+                  rootContainer.setOrientation(LinearLayout.VERTICAL);
+                  rootContainer.setPadding(24, 34, 24, rootBaseBottomPadding);
+                  rootScroll.addView(rootContainer);
           
                   TextView title = text("手机助手工具箱", 32, Color.WHITE);
                   title.setTypeface(Typeface.DEFAULT_BOLD);
                   title.setGravity(Gravity.CENTER_HORIZONTAL);
-                  root.addView(title);
+                  rootContainer.addView(title);
                   TextView subtitle = text("复制 · 快捷 · 计时 · 番茄钟 · AI", 14, Color.rgb(148, 163, 184));
                   subtitle.setGravity(Gravity.CENTER_HORIZONTAL);
-                  root.addView(subtitle);
-          
-                  LinearLayout tabs1 = row();
-                  homeTab = button("首页");
-                  splitTab = button("复制");
-                  textTab = button("文本");
-                  tabs1.addView(homeTab, weight());
-                  tabs1.addView(splitTab, weight());
-                  tabs1.addView(textTab, weight());
-                  root.addView(tabs1);
-          
-                  LinearLayout tabs2 = row();
-                  linkTab = button("链接");
-                  timerTab = button("计时器");
-                  pomoTab = button("番茄钟");
-                  tabs2.addView(linkTab, weight());
-                  tabs2.addView(timerTab, weight());
-                  tabs2.addView(pomoTab, weight());
-                  root.addView(tabs2);
-          
-                  LinearLayout tabs3 = row();
-                  aiTab = button("AI聊天");
-                  aiSettingsTab = button("AI设置");
-                  backupTab = button("备份");
-                  tabs3.addView(aiTab, weight());
-                  tabs3.addView(aiSettingsTab, weight());
-                  tabs3.addView(backupTab, weight());
-                  root.addView(tabs3);
+                  rootContainer.addView(subtitle);
           
                   statusText = text("准备就绪", 14, Color.rgb(52, 211, 153));
-                  root.addView(statusText);
+                  rootContainer.addView(statusText);
           
                   homePage = page();
                   splitPage = page();
@@ -290,15 +269,15 @@ jobs:
                   aiPage = page();
                   aiSettingsPage = page();
                   backupPage = page();
-                  root.addView(homePage);
-                  root.addView(splitPage);
-                  root.addView(textPage);
-                  root.addView(linkPage);
-                  root.addView(timerPage);
-                  root.addView(pomoPage);
-                  root.addView(aiPage);
-                  root.addView(aiSettingsPage);
-                  root.addView(backupPage);
+                  rootContainer.addView(homePage);
+                  rootContainer.addView(splitPage);
+                  rootContainer.addView(textPage);
+                  rootContainer.addView(linkPage);
+                  rootContainer.addView(timerPage);
+                  rootContainer.addView(pomoPage);
+                  rootContainer.addView(aiPage);
+                  rootContainer.addView(aiSettingsPage);
+                  rootContainer.addView(backupPage);
           
                   buildHomePage();
                   buildSplitPage();
@@ -310,17 +289,8 @@ jobs:
                   buildAiSettingsPage();
                   buildBackupPage();
           
-                  homeTab.setOnClickListener(v -> showPage("home"));
-                  splitTab.setOnClickListener(v -> showPage("split"));
-                  textTab.setOnClickListener(v -> showPage("text"));
-                  linkTab.setOnClickListener(v -> showPage("link"));
-                  timerTab.setOnClickListener(v -> showPage("timer"));
-                  pomoTab.setOnClickListener(v -> showPage("pomo"));
-                  aiTab.setOnClickListener(v -> showPage("ai"));
-                  aiSettingsTab.setOnClickListener(v -> showPage("aiSettings"));
-                  backupTab.setOnClickListener(v -> showPage("backup"));
-          
-                  setContentView(scroll);
+                  setContentView(rootScroll);
+                  installKeyboardGuard();
                   showPage("home");
               }
           
@@ -353,6 +323,7 @@ jobs:
               }
           
               private void buildSplitPage() {
+                  splitPage.addView(backHomeButton());
                   splitPage.addView(sectionTitle("长文本分段复制"));
                   splitPage.addView(infoCard("把很长的代码、工作流、提示词粘到这里，App 会自动分段，每段都有复制按钮。"));
                   longTextInput = inputBox("粘贴长文本");
@@ -384,6 +355,7 @@ jobs:
               }
           
               private void buildTextPage() {
+                  textPage.addView(backHomeButton());
                   textPage.addView(sectionTitle("常用文本"));
                   textPage.addView(infoCard("保存常用路径、API 地址、模型名、提交信息。以后点一下就能复制。"));
                   titleInput = inputBox("标题，例如 OpenRouter API 地址");
@@ -402,6 +374,7 @@ jobs:
               }
           
               private void buildLinkPage() {
+                  linkPage.addView(backHomeButton());
                   linkPage.addView(sectionTitle("快捷打开"));
                   linkPage.addView(infoCard("保存常用网站，一键打开 GitHub、OpenRouter、Actions 等页面。"));
                   linkTitleInput = inputBox("标题，例如 GitHub");
@@ -419,6 +392,7 @@ jobs:
               }
           
               private void buildTimerPage() {
+                  timerPage.addView(backHomeButton());
                   timerPage.addView(sectionTitle("计时器"));
                   timerPage.addView(infoCard("包含正计时、倒计时和快速倒计时。适合临时计时，不替代闹钟。"));
                   LinearLayout modeRow = row();
@@ -473,6 +447,7 @@ jobs:
               }
           
               private void buildPomoPage() {
+                  pomoPage.addView(backHomeButton());
                   pomoPage.addView(sectionTitle("番茄钟"));
                   pomoPage.addView(infoCard("默认专注 25 分钟、休息 5 分钟。适合学习节奏管理。"));
                   pomoStateText = text("准备开始专注", 18, Color.rgb(125, 211, 252));
@@ -522,6 +497,7 @@ jobs:
               }
           
               private void buildAiPage() {
+                  aiPage.addView(backHomeButton());
                   aiPage.addView(sectionTitle("AI聊天"));
                   aiPage.addView(infoCard("这里使用 OpenAI 兼容接口。首次使用请先进入 AI设置，填写 API Key。"));
                   aiMessageList = new LinearLayout(this);
@@ -551,6 +527,7 @@ jobs:
               }
           
               private void buildAiSettingsPage() {
+                  aiSettingsPage.addView(backHomeButton());
                   aiSettingsPage.addView(sectionTitle("AI设置"));
                   aiSettingsPage.addView(infoCard("API Key 只保存在本机，不会写进 GitHub。推荐模型名保持 openrouter/free。"));
           
@@ -596,6 +573,7 @@ jobs:
               }
           
               private void buildBackupPage() {
+                  backupPage.addView(backHomeButton());
                   backupPage.addView(sectionTitle("数据备份"));
                   backupPage.addView(infoCard("导出和导入常用文本、快捷链接。不会导出 AI Key，避免密钥泄露。"));
                   LinearLayout actions = row();
@@ -607,6 +585,12 @@ jobs:
                   backupPage.addView(infoCard("导出的文件是 JSON 文本。换手机、重装 App 或误删内容时，可以用它恢复常用文本和快捷链接。"));
                   export.setOnClickListener(v -> createBackupFile());
                   importBackup.setOnClickListener(v -> chooseBackupFile());
+              }
+          
+              private Button backHomeButton() {
+                  Button back = button("← 返回首页");
+                  back.setOnClickListener(v -> showPage("home"));
+                  return back;
               }
           
               private void chooseTextFile() {
@@ -1433,15 +1417,7 @@ jobs:
                   aiPage.setVisibility("ai".equals(pageName) ? View.VISIBLE : View.GONE);
                   aiSettingsPage.setVisibility("aiSettings".equals(pageName) ? View.VISIBLE : View.GONE);
                   backupPage.setVisibility("backup".equals(pageName) ? View.VISIBLE : View.GONE);
-                  homeTab.setAlpha("home".equals(pageName) ? 1f : 0.55f);
-                  splitTab.setAlpha("split".equals(pageName) ? 1f : 0.55f);
-                  textTab.setAlpha("text".equals(pageName) ? 1f : 0.55f);
-                  linkTab.setAlpha("link".equals(pageName) ? 1f : 0.55f);
-                  timerTab.setAlpha("timer".equals(pageName) ? 1f : 0.55f);
-                  pomoTab.setAlpha("pomo".equals(pageName) ? 1f : 0.55f);
-                  aiTab.setAlpha("ai".equals(pageName) ? 1f : 0.55f);
-                  aiSettingsTab.setAlpha("aiSettings".equals(pageName) ? 1f : 0.55f);
-                  backupTab.setAlpha("backup".equals(pageName) ? 1f : 0.55f);
+                  if (rootScroll != null) rootScroll.post(() -> rootScroll.smoothScrollTo(0, 0));
               }
           
               private TextView text(String value, int sp, int color) {
@@ -1501,13 +1477,44 @@ jobs:
                   e.setPadding(16, 12, 16, 12);
                   e.setOnFocusChangeListener((view, hasFocus) -> {
                       if (hasFocus) {
-                          view.postDelayed(() -> view.requestRectangleOnScreen(
-                                  new android.graphics.Rect(0, 0, view.getWidth(), view.getHeight() + 240),
-                                  true
-                          ), 250);
+                          view.postDelayed(() -> scrollFocusedInputIntoView(view), 300);
                       }
                   });
                   return e;
+              }
+          
+              private void installKeyboardGuard() {
+                  final View rootView = rootScroll;
+                  rootView.getViewTreeObserver().addOnGlobalLayoutListener(() -> {
+                      Rect visible = new Rect();
+                      rootView.getWindowVisibleDisplayFrame(visible);
+                      int screenHeight = rootView.getRootView().getHeight();
+                      int keyboardHeight = Math.max(0, screenHeight - visible.bottom);
+                      boolean keyboardOpen = keyboardHeight > screenHeight * 0.15f;
+                      int bottomPadding = keyboardOpen ? keyboardHeight + 160 : rootBaseBottomPadding;
+                      rootContainer.setPadding(
+                              rootContainer.getPaddingLeft(),
+                              rootContainer.getPaddingTop(),
+                              rootContainer.getPaddingRight(),
+                              bottomPadding
+                      );
+                      if (keyboardOpen && getCurrentFocus() instanceof EditText) {
+                          rootScroll.postDelayed(() -> scrollFocusedInputIntoView(getCurrentFocus()), 80);
+                      }
+                  });
+              }
+          
+              private void scrollFocusedInputIntoView(View view) {
+                  if (view == null || rootScroll == null) return;
+                  int[] scrollLocation = new int[2];
+                  int[] viewLocation = new int[2];
+                  rootScroll.getLocationOnScreen(scrollLocation);
+                  view.getLocationOnScreen(viewLocation);
+                  int viewBottom = viewLocation[1] - scrollLocation[1] + view.getHeight();
+                  int safeBottom = rootScroll.getHeight() - 260;
+                  if (viewBottom > safeBottom) {
+                      rootScroll.smoothScrollBy(0, viewBottom - safeBottom + 80);
+                  }
               }
           
               private LinearLayout card() {
