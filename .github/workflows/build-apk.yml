@@ -70,8 +70,8 @@ jobs:
                   applicationId "com.trae.phonehelper"
                   minSdk 26
                   targetSdk 35
-                  versionCode 18
-                  versionName "1.7"
+                  versionCode 19
+                  versionName "1.7.1"
               }
           }
           EOF_app_build_gradle
@@ -143,6 +143,7 @@ jobs:
           import android.widget.Button;
           import android.widget.CheckBox;
           import android.widget.EditText;
+          import android.widget.FrameLayout;
           import android.widget.LinearLayout;
           import android.widget.ScrollView;
           import android.widget.TextView;
@@ -172,7 +173,9 @@ jobs:
           
               private LinearLayout homePage, splitPage, textPage, linkPage, timerPage, pomoPage, aiPage, aiSettingsPage, backupPage;
               private LinearLayout splitResultList, savedTextList, linkList, aiMessageList;
+              private FrameLayout rootFrame;
               private ScrollView rootScroll;
+              private ScrollView aiMessageScroll;
               private LinearLayout rootContainer;
               private EditText longTextInput, splitSizeInput, titleInput, contentInput, linkTitleInput, linkUrlInput;
               private EditText aiInput, apiUrlInput, apiKeyInput, modelInput, systemPromptInput;
@@ -221,6 +224,7 @@ jobs:
                   pref = getSharedPreferences(PREF, MODE_PRIVATE);
                   ensureDefaults();
                   refreshDefaultContentFor17();
+                  refreshDefaultContentFor171();
                   restoreTimerState();
                   restorePomoState();
                   loadAiMessages();
@@ -246,6 +250,9 @@ jobs:
               }
           
               private void buildUi() {
+                  rootFrame = new FrameLayout(this);
+                  rootFrame.setBackgroundColor(Color.rgb(7, 17, 31));
+          
                   rootScroll = new ScrollView(this);
                   rootScroll.setFillViewport(false);
                   rootScroll.setClipToPadding(false);
@@ -274,7 +281,6 @@ jobs:
                   rootContainer.addView(linkPage);
                   rootContainer.addView(timerPage);
                   rootContainer.addView(pomoPage);
-                  rootContainer.addView(aiPage);
                   rootContainer.addView(aiSettingsPage);
                   rootContainer.addView(backupPage);
           
@@ -288,7 +294,16 @@ jobs:
                   buildAiSettingsPage();
                   buildBackupPage();
           
-                  setContentView(rootScroll);
+                  rootFrame.addView(rootScroll, new FrameLayout.LayoutParams(
+                          FrameLayout.LayoutParams.MATCH_PARENT,
+                          FrameLayout.LayoutParams.MATCH_PARENT
+                  ));
+                  rootFrame.addView(aiPage, new FrameLayout.LayoutParams(
+                          FrameLayout.LayoutParams.MATCH_PARENT,
+                          FrameLayout.LayoutParams.MATCH_PARENT
+                  ));
+          
+                  setContentView(rootFrame);
                   installKeyboardGuard();
                   showPage("home");
               }
@@ -506,51 +521,45 @@ jobs:
               }
           
               private void buildAiPage() {
+                  aiPage.setPadding(24, 120, 24, 20);
+                  aiPage.setBackgroundColor(Color.rgb(7, 17, 31));
                   aiPage.addView(sectionTitle("AI聊天"));
                   aiPage.addView(infoCard("这里使用 OpenAI 兼容接口。首次使用请先进入 AI设置，填写 API Key。"));
+          
+                  aiMessageScroll = new ScrollView(this);
+                  aiMessageScroll.setFillViewport(false);
+                  aiMessageScroll.setClipToPadding(false);
                   aiMessageList = new LinearLayout(this);
                   aiMessageList.setOrientation(LinearLayout.VERTICAL);
-                  aiPage.addView(aiMessageList);
+                  aiMessageScroll.addView(aiMessageList);
+                  aiPage.addView(aiMessageScroll, new LinearLayout.LayoutParams(
+                          LinearLayout.LayoutParams.MATCH_PARENT,
+                          0,
+                          1
+                  ));
+          
+                  LinearLayout inputArea = new LinearLayout(this);
+                  inputArea.setOrientation(LinearLayout.VERTICAL);
+                  inputArea.setPadding(0, 10, 0, 0);
+                  GradientDrawable inputBg = new GradientDrawable();
+                  inputBg.setColor(Color.rgb(7, 17, 31));
+                  inputBg.setStroke(1, Color.rgb(30, 41, 59));
+                  inputBg.setCornerRadius(20);
+                  inputArea.setBackground(inputBg);
           
                   aiInput = inputBox("输入你想问 AI 的内容");
                   aiInput.setMinLines(2);
                   aiInput.setMaxLines(5);
-                  aiPage.addView(aiInput);
-          
-                  aiPage.addView(sectionTitle("快捷提示词"));
-                  aiPage.addView(infoCard("点一下会填入输入框，不会自动发送。你可以继续补充内容后再发送。"));
-                  LinearLayout promptRow1 = row();
-                  Button explain = button("解释内容");
-                  Button fix = button("检查错误");
-                  promptRow1.addView(explain, weight());
-                  promptRow1.addView(fix, weight());
-                  aiPage.addView(promptRow1);
-                  LinearLayout promptRow2 = row();
-                  Button plan = button("学习计划");
-                  Button notes = button("整理笔记");
-                  promptRow2.addView(plan, weight());
-                  promptRow2.addView(notes, weight());
-                  aiPage.addView(promptRow2);
-                  LinearLayout promptRow3 = row();
-                  Button translate = button("翻译中文");
-                  Button polish = button("润色文字");
-                  promptRow3.addView(translate, weight());
-                  promptRow3.addView(polish, weight());
-                  aiPage.addView(promptRow3);
+                  inputArea.addView(aiInput);
           
                   LinearLayout actions = row();
                   aiSendButton = button("发送");
                   Button clear = button("清空");
                   actions.addView(aiSendButton, weight());
                   actions.addView(clear, weight());
-                  aiPage.addView(actions);
+                  inputArea.addView(actions);
+                  aiPage.addView(inputArea);
           
-                  explain.setOnClickListener(v -> fillAiPrompt("请用通俗易懂的中文解释下面这段内容，先总结重点，再分点说明："));
-                  fix.setOnClickListener(v -> fillAiPrompt("请帮我检查下面的问题或报错，说明可能原因，并给出一步步解决方法："));
-                  plan.setOnClickListener(v -> fillAiPrompt("请根据下面的目标，帮我制定一个简单、可执行的学习计划："));
-                  notes.setOnClickListener(v -> fillAiPrompt("请把下面内容整理成清晰的笔记，保留重点、步骤和注意事项："));
-                  translate.setOnClickListener(v -> fillAiPrompt("请把下面内容翻译成自然、准确的中文："));
-                  polish.setOnClickListener(v -> fillAiPrompt("请帮我润色下面这段文字，让它更清楚、自然、礼貌，但不要改变原意："));
                   aiSendButton.setOnClickListener(v -> sendAiMessage());
                   clear.setOnClickListener(v -> {
                       aiMessages = new JSONArray();
@@ -559,19 +568,6 @@ jobs:
                       showStatus("AI 对话已清空");
                   });
                   renderAiMessages();
-              }
-          
-              private void fillAiPrompt(String prompt) {
-                  String current = aiInput.getText().toString().trim();
-                  if (current.isEmpty()) {
-                      aiInput.setText(prompt + "\n");
-                  } else {
-                      aiInput.setText(prompt + "\n\n" + current);
-                  }
-                  aiInput.setSelection(aiInput.getText().length());
-                  aiInput.requestFocus();
-                  showStatus("已填入快捷提示词");
-                  scrollFocusedInputIntoView(aiInput);
               }
           
               private void buildAiSettingsPage() {
@@ -1357,6 +1353,9 @@ jobs:
                           aiMessageList.addView(aiBubble(msg.optString("role"), msg.optString("content")));
                       } catch (Exception ignored) {}
                   }
+                  if (aiMessageScroll != null) {
+                      aiMessageScroll.post(() -> aiMessageScroll.smoothScrollTo(0, aiMessageList.getBottom()));
+                  }
               }
           
               private View aiBubble(String role, String content) {
@@ -1446,8 +1445,7 @@ jobs:
                       addDefaultLink(links, "OpenRouter", "https://openrouter.ai");
                       addDefaultLink(links, "OpenRouter Keys", "https://openrouter.ai/settings/keys");
                       addDefaultLink(links, "DeepSeek API", "https://platform.deepseek.com");
-                      addDefaultLink(links, "Netlify", "https://www.netlify.com");
-                      addDefaultLink(links, "WebIntoApp 网页封装", "https://www.webintoapp.com");
+                      addDefaultLink(links, "Netlify Drop", "https://app.netlify.com/drop");
                       pref.edit()
                               .putString("texts", texts.toString())
                               .putString("links", links.toString())
@@ -1479,6 +1477,25 @@ jobs:
                   addLinkIfMissing(links, "WebIntoApp 网页封装", "https://www.webintoapp.com");
                   saveArray("links", links);
                   pref.edit().putBoolean("defaultsV17Ready", true).apply();
+              }
+          
+              private void refreshDefaultContentFor171() {
+                  if (pref.getBoolean("defaultsV171Ready", false)) return;
+                  JSONArray oldLinks = loadArray("links");
+                  JSONArray newLinks = new JSONArray();
+                  for (int i = 0; i < oldLinks.length(); i++) {
+                      try {
+                          JSONObject obj = oldLinks.getJSONObject(i);
+                          String title = obj.optString("title", "");
+                          String url = obj.optString("url", "");
+                          if ("Netlify".equals(title) || "https://www.netlify.com".equalsIgnoreCase(url)) continue;
+                          if (title.contains("WebIntoApp") || "https://www.webintoapp.com".equalsIgnoreCase(url)) continue;
+                          newLinks.put(obj);
+                      } catch (Exception ignored) {}
+                  }
+                  addLinkIfMissing(newLinks, "Netlify Drop", "https://app.netlify.com/drop");
+                  saveArray("links", newLinks);
+                  pref.edit().putBoolean("defaultsV171Ready", true).apply();
               }
           
               private void addLinkIfMissing(JSONArray array, String title, String url) {
@@ -1545,16 +1562,22 @@ jobs:
                   currentPage = pageName;
                   hideKeyboard();
                   hideStatus();
+                  boolean aiVisible = "ai".equals(pageName);
+                  rootScroll.setVisibility(aiVisible ? View.GONE : View.VISIBLE);
                   homePage.setVisibility("home".equals(pageName) ? View.VISIBLE : View.GONE);
                   splitPage.setVisibility("split".equals(pageName) ? View.VISIBLE : View.GONE);
                   textPage.setVisibility("text".equals(pageName) ? View.VISIBLE : View.GONE);
                   linkPage.setVisibility("link".equals(pageName) ? View.VISIBLE : View.GONE);
                   timerPage.setVisibility("timer".equals(pageName) ? View.VISIBLE : View.GONE);
                   pomoPage.setVisibility("pomo".equals(pageName) ? View.VISIBLE : View.GONE);
-                  aiPage.setVisibility("ai".equals(pageName) ? View.VISIBLE : View.GONE);
+                  aiPage.setVisibility(aiVisible ? View.VISIBLE : View.GONE);
                   aiSettingsPage.setVisibility("aiSettings".equals(pageName) ? View.VISIBLE : View.GONE);
                   backupPage.setVisibility("backup".equals(pageName) ? View.VISIBLE : View.GONE);
-                  if (rootScroll != null) rootScroll.post(() -> rootScroll.smoothScrollTo(0, 0));
+                  if (aiVisible && aiMessageScroll != null) {
+                      aiMessageScroll.post(() -> aiMessageScroll.smoothScrollTo(0, aiMessageList.getBottom()));
+                  } else if (rootScroll != null) {
+                      rootScroll.post(() -> rootScroll.smoothScrollTo(0, 0));
+                  }
               }
           
               @Override
@@ -1667,6 +1690,10 @@ jobs:
           
               private void scrollFocusedInputIntoView(View view) {
                   if (view == null || rootScroll == null) return;
+                  if ("ai".equals(currentPage)) {
+                      view.requestRectangleOnScreen(new Rect(0, 0, view.getWidth(), view.getHeight()), true);
+                      return;
+                  }
                   int[] scrollLocation = new int[2];
                   int[] viewLocation = new int[2];
                   rootScroll.getLocationOnScreen(scrollLocation);
